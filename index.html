@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MandibulaMechanics 3D - Simulador Biomecánico</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- KaTeX for Beautiful Math Formulas -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="renderStaticMath()"></script>
+    <!-- Three.js and OrbitControls CDNs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Local Stylesheet -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-mode">
+    <div class="app-container">
+        <!-- Top Navigation Bar -->
+        <header class="app-header">
+            <div class="brand">
+                <i class="fa-solid fa-tooth header-icon"></i>
+                <div>
+                    <h1>MandibulaMechanics <span class="badge">3D</span></h1>
+                    <p>Simulador Biomecánico Educativo de la Mandíbula Humana</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="theme-toggle" class="btn-icon" title="Cambiar tema">
+                    <i class="fa-solid fa-sun"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Workspace Dashboard -->
+        <main class="app-workspace">
+            
+            <!-- Left Panel: Parameter Controls -->
+            <section class="panel panel-controls" id="panel-inputs">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-sliders"></i> Parámetros de Entrada</h2>
+                </div>
+                <div class="panel-body">
+                    <!-- Mandible Geometry Config -->
+                    <details class="control-group" id="details-geometry" open>
+                        <summary><i class="fa-solid fa-compass-drafting"></i> Geometría de la Mandíbula</summary>
+                        <div class="control-inputs">
+                            <div class="input-row" data-tooltip="Distancia lateral entre ambas articulaciones condilares (ATM). Determina la anchura de la base mandibular.">
+                                <label for="input-jaw-width">Ancho Intercondilar (2w) <span class="unit">(mm)</span></label>
+                                <div class="slider-container">
+                                    <input type="range" id="input-jaw-width" min="20" max="600" value="120" step="1">
+                                    <span class="value-display" id="val-jaw-width">120</span>
+                                </div>
+                            </div>
+                            <div class="input-row" data-tooltip="Distancia desde el eje articular posterior hasta la punta anterior de la barbilla. Define la longitud de la palanca.">
+                                <label for="input-jaw-length">Longitud Mandibular (L) <span class="unit">(mm)</span></label>
+                                <div class="slider-container">
+                                    <input type="range" id="input-jaw-length" min="15" max="500" value="100" step="1">
+                                    <span class="value-display" id="val-jaw-length">100</span>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Bite Configuration -->
+                    <details class="control-group" id="details-bite" open>
+                        <summary><i class="fa-solid fa-apple-whole"></i> Configuración de la Mordida</summary>
+                        <div class="control-inputs">
+                            <div class="input-row" data-tooltip="Preconfigura ubicaciones dentarias típicas para morder. Las muelas traseras multiplican más la fuerza que los dientes delanteros.">
+                                <label for="bite-preset">Punto de Mordida (Preset)</label>
+                                <select id="bite-preset" class="form-select">
+                                    <option value="incisors" selected>Incisivos (Centro Frontal)</option>
+                                    <option value="molar-left">Molares Izquierdos (Posterior Izq.)</option>
+                                    <option value="molar-right">Molares Derechos (Posterior Der.)</option>
+                                    <option value="premolar-left">Premolares Izquierdos (Medio Izq.)</option>
+                                    <option value="premolar-right">Premolares Derechos (Medio Der.)</option>
+                                    <option value="custom">Personalizado</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Custom coordinates (shown always but editable) -->
+                            <div class="coordinates-grid">
+                                <div data-tooltip="Coordenada X (lateral) de la mordida. 0 es el centro; negativo a la izquierda, positivo a la derecha.">
+                                    <label>x<sub>B</sub> <span class="unit">(mm)</span></label>
+                                    <input type="number" id="input-xb" value="0" step="1" class="form-number">
+                                </div>
+                                <div data-tooltip="Coordenada Y (anteroposterior) del contacto dentario. Distancia horizontal desde el eje de rotación trasero.">
+                                    <label>y<sub>B</sub> <span class="unit">(mm)</span></label>
+                                    <input type="number" id="input-yb" value="100" step="1" class="form-number">
+                                </div>
+                                <div data-tooltip="Coordenada Z (vertical) de la mordida. Indica la altura del plano de oclusión de los dientes.">
+                                    <label>z<sub>B</sub> <span class="unit">(mm)</span></label>
+                                    <input type="number" id="input-zb" value="-10" step="1" class="form-number">
+                                </div>
+                            </div>
+
+                            <div class="input-row" data-tooltip="Selecciona si la fuerza de resistencia del alimento es vertical pura (hacia abajo) o libre en el espacio tridimensional.">
+                                <label for="bite-direction-type">Dirección de la Fuerza de Reacción</label>
+                                <select id="bite-direction-type" class="form-select">
+                                    <option value="vertical-down" selected>Vertical Pura (Hacia abajo)</option>
+                                    <option value="free">Dirección Angular Libre</option>
+                                </select>
+                            </div>
+
+                            <div id="bite-dir-container" class="coordinates-grid hidden">
+                                <div data-tooltip="Componente lateral (X) del vector de dirección unitario de reacción.">
+                                    <label>u<sub>Bx</sub></label>
+                                    <input type="number" id="input-ubx" value="0" step="0.1" max="1" min="-1" class="form-number">
+                                </div>
+                                <div data-tooltip="Componente anteroposterior (Y) del vector unitario de dirección de reacción.">
+                                    <label>u<sub>By</sub></label>
+                                    <input type="number" id="input-uby" value="0" step="0.1" max="1" min="-1" class="form-number">
+                                </div>
+                                <div data-tooltip="Componente vertical (Z) del vector unitario de dirección. Por defecto es -1 (empuja hacia abajo).">
+                                    <label>u<sub>Bz</sub></label>
+                                    <input type="number" id="input-ubz" value="-1" step="0.1" max="1" min="-1" class="form-number">
+                                </div>
+                            </div>
+                            <span class="hint-text"><i class="fa-solid fa-circle-info"></i> Dirección del vector unitario en el que el alimento empuja hacia abajo la mandíbula.</span>
+                        </div>
+                    </details>
+
+                    <!-- Muscles Configuration -->
+                    <details class="control-group" id="details-muscles" open>
+                        <summary><i class="fa-solid fa-dumbbell"></i> Fuerza y Posición de los Músculos</summary>
+                        <div class="control-inputs" id="muscles-container">
+                            <!-- Muscle settings will be dynamically injected here for clean maintenance -->
+                        </div>
+                    </details>
+                </div>
+            </section>
+
+            <!-- Center Panel: 3D Simulator Viewport -->
+            <section class="panel panel-viewport" id="panel-3d">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-cube"></i> Visualización 3D Interactiva</h2>
+                    <div class="camera-presets">
+                        <button class="btn btn-sm btn-primary" id="btn-play-sim" onclick="togglePlayAnimation()" data-tooltip="Iniciar/Pausar la simulación animada del movimiento masticatorio de la mandíbula."><i class="fa-solid fa-play"></i> Simulación</button>
+                        <button class="btn btn-sm btn-secondary" onclick="toggleTheoryModal(true)" data-tooltip="Mostrar la teoría biomecánica y bases físicas del simulador."><i class="fa-solid fa-graduation-cap"></i> Guía Teórica</button>
+                        <button class="btn btn-sm btn-secondary" onclick="setCameraPreset('front')" data-tooltip="Ver mandíbula de frente (enfocando la barbilla).">Frontal</button>
+                        <button class="btn btn-sm btn-secondary" onclick="setCameraPreset('side')" data-tooltip="Ver perfil de la mandíbula (vista sagital lateral).">Lateral</button>
+                        <button class="btn btn-sm btn-secondary" onclick="setCameraPreset('top')" data-tooltip="Ver mandíbula desde arriba (plano oclusal horizontal).">Superior</button>
+                        <button class="btn btn-sm btn-secondary" onclick="setCameraPreset('iso')" data-tooltip="Perspectiva diagonal tridimensional de 3/4 (vista isométrica).">Isométrica</button>
+                        <button class="btn btn-sm btn-secondary" id="btn-toggle-axes" onclick="toggleAxes()" data-tooltip="Activa o desactiva la visualización de los ejes de coordenadas X, Y, Z en el piso."><i class="fa-solid fa-arrows-to-dot"></i> Ejes: ON</button>
+                    </div>
+                </div>
+                <div class="viewport-wrapper">
+                    <div id="threejs-container"></div>
+                    
+                    <!-- Overlay para la Guía Teórica y Educativa -->
+                    <div class="theory-overlay" id="theory-modal-overlay">
+                        <div class="theory-modal-card">
+                            <button class="theory-close-btn" onclick="toggleTheoryModal(false)">&times;</button>
+                            <div class="theory-modal-header">
+                                <h2><i class="fa-solid fa-graduation-cap"></i> Guía Teórica: La Mandíbula como Palanca 3D</h2>
+                            </div>
+                            <div class="theory-modal-body">
+                                <div class="grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                                    <article class="theory-card">
+                                        <h3>La Mandíbula como Palanca de 3ª Clase</h3>
+                                        <p>En física, las palancas se clasifican según la posición relativa del fulcro (ATM), el esfuerzo (músculos) y la resistencia (mordida).</p>
+                                        <ul style="margin: 0.5rem 0; padding-left: 1.2rem; font-size: 0.72rem;">
+                                            <li><strong>Fulcro:</strong> Las articulaciones temporomandibulares (ATM) en la parte posterior.</li>
+                                            <li><strong>Esfuerzo:</strong> Los potentes músculos elevadores (Masetero, Temporal y Pterigoideo Medial) cuyas inserciones se encuentran por delante de la ATM.</li>
+                                            <li><strong>Resistencia:</strong> El objeto alimentario que se muerde con los dientes en el extremo anterior.</li>
+                                        </ul>
+                                        <p>Dado que el esfuerzo se aplica entre el fulcro y la resistencia, la mandíbula funciona como una <strong>palanca de tercer grado</strong> (se pierde fuerza a cambio de velocidad y rango de movimiento angular).</p>
+                                        <div class="alert-box note" style="padding: 0.5rem 0.8rem; margin-top: 0.8rem; font-size: 0.7rem;">
+                                            <i class="fa-solid fa-lightbulb"></i>
+                                            <span><strong>Excepción:</strong> Al morder muy atrás (molares), la mordida queda por detrás de algunos músculos, funcionando temporalmente como palanca de <strong>segunda clase</strong>, lo que amplifica enormemente la fuerza.</span>
+                                        </div>
+                                    </article>
+
+                                    <article class="theory-card">
+                                        <h3>Análisis 3D y Soporte Condilar Doble</h3>
+                                        <p>En un análisis con un solo punto de pivote, la ecuación de momento es singular, haciendo físicamente imposible contrarrestar un torque tridimensional arbitrario con un solo contacto.</p>
+                                        <p><strong>La solución real:</strong> La mandíbula pivota sobre <strong>dos articulaciones (ATM izquierda y derecha)</strong> separadas a una distancia lateral de \(2w\).</p>
+                                        <p>Al haber dos apoyos condilares, las fuerzas de reacción articulares (\(\vec{F}_{JL}\) y \(\vec{F}_{JR}\)) actúan en \(-w\) y \(+w\), creando un momento de acoplamiento que absorbe los torques en Y (cabeceo) y Z (guiñada).</p>
+                                        <p>Dado que ambos condilos se sitúan sobre el eje X (eje de bisagra), no pueden producir torque en X. Por lo tanto, el torque muscular total en X (\(T_x\)) debe ser balanceado exclusivamente por la mordida:</p>
+                                        <div class="math-block" style="background: rgba(0,0,0,0.2); padding: 0.4rem; border-radius: var(--border-radius-sm); text-align: center; margin: 0.5rem 0;">
+                                            $$y_B F_{Bz} - z_B F_{By} = -T_x$$
+                                        </div>
+                                        <p style="font-size: 0.7rem; color: var(--text-muted);">Usa los sliders para ajustar la geometría de la mandíbula y anclajes de los músculos para ver cómo afecta a la ventaja mecánica y fuerzas en las articulaciones.</p>
+                                    </article>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Viewport overlay controls / legend -->
+                    <div class="viewport-overlay">
+                        <div class="legend-card">
+                            <h4>Leyenda de Vectores</h4>
+                            <ul>
+                                <li data-tooltip="Las flechas verdes muestran la magnitud y dirección de tracción de los músculos activos."><span class="legend-color muscle-color"></span> Músculo Activo (<span class="unit">N</span>)</li>
+                                <li data-tooltip="La flecha roja representa la fuerza reactiva que ejerce el alimento sobre el diente."><span class="legend-color bite-color"></span> Fuerza de Mordida (<span class="unit">N</span>)</li>
+                                <li data-tooltip="Muestra las cargas condilares en la articulación izquierda (flecha morada)."><span class="legend-color joint-left-color"></span> Condilo Izquierdo ATM</li>
+                                <li data-tooltip="Muestra las cargas condilares en la articulación derecha (flecha azul)."><span class="legend-color joint-right-color"></span> Condilo Derecho ATM</li>
+                            </ul>
+                        </div>
+                        <div class="interaction-help">
+                            <span><i class="fa-solid fa-mouse"></i> Arrasta para rotar | Scroll para zoom</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Draggable resizer -->
+            <div class="resizer-v" id="resizer-right"></div>
+
+            <!-- Right Panel: Results and Step-by-Step Math -->
+            <section class="panel panel-results" id="panel-math">
+                <div class="panel-header tab-header">
+                    <button class="tab-btn active" id="btn-tab-results" onclick="switchTab('tab-results')" data-tooltip="Muestra los resultados finales de fuerza, ventaja mecánica global y diagramas de contribución."><i class="fa-solid fa-chart-simple"></i> Resultados</button>
+                    <button class="tab-btn" id="btn-tab-calculation" onclick="switchTab('tab-calculation')" data-tooltip="Desglosa paso a paso las fórmulas matemáticas cargadas con tus valores actuales en KaTeX."><i class="fa-solid fa-square-root-variable"></i> Memoria de Cálculo</button>
+                    <button class="tab-btn" id="btn-tab-glossary" onclick="switchTab('tab-glossary')" data-tooltip="Explica conceptos clave de biomecánica: torque, vectores, ventaja mecánica y más."><i class="fa-solid fa-book"></i> Glosario</button>
+                </div>
+                <div class="panel-body">
+                    
+                    <!-- TAB 1: RESULTS SUMMARY -->
+                    <div id="tab-results" class="tab-content active">
+                        <!-- Key Performance Indicator Cards -->
+                        <div class="kpi-grid">
+                            <div class="kpi-card highlight" data-tooltip="Fuerza útil de mordida calculada a partir del equilibrio estático de torque en el eje de bisagra (X).">
+                                <span class="kpi-label">Fuerza de Mordida Total (F<sub>B</sub>)</span>
+                                <span class="kpi-value" id="res-fb-mag">0.0 <span class="kpi-unit">N</span></span>
+                                <span class="kpi-subtext" id="res-fb-vector">Vector: [0, 0, 0] N</span>
+                            </div>
+                            <div class="kpi-card" data-tooltip="Fuerza útil obtenida dividida entre el esfuerzo muscular total. Valores mayores a 1 indican multiplicación de fuerza.">
+                                <span class="kpi-label">Ventaja Mecánica (MA<sub>global</sub>)</span>
+                                <span class="kpi-value" id="res-ma">0.00</span>
+                                <span class="kpi-subtext">Eficiencia de la palanca</span>
+                            </div>
+                        </div>
+
+                        <div class="kpi-grid joint-forces-grid">
+                            <div class="kpi-card joint-card" data-tooltip="Fuerza de reacción que soporta la articulación izquierda (ATM) para mantener el equilibrio estático de fuerzas y torques laterales.">
+                                <span class="kpi-label">Reacción ATM Izquierda (F<sub>JL</sub>)</span>
+                                <span class="kpi-value" id="res-fjl-mag">0.0 <span class="kpi-unit">N</span></span>
+                                <span class="kpi-subtext" id="res-fjl-vector">Vector: [0, 0, 0] N</span>
+                            </div>
+                            <div class="kpi-card joint-card" data-tooltip="Fuerza de reacción que soporta la articulación derecha (ATM) para estabilizar el sistema.">
+                                <span class="kpi-label">Reacción ATM Derecha (F<sub>JR</sub>)</span>
+                                <span class="kpi-value" id="res-fjr-mag">0.0 <span class="kpi-unit">N</span></span>
+                                <span class="kpi-subtext" id="res-fjr-vector">Vector: [0, 0, 0] N</span>
+                            </div>
+                        </div>
+
+                        <!-- Muscle Contribution Bars -->
+                        <div class="results-section">
+                            <h3>Distribución de Fuerza Muscular Activa</h3>
+                            <div id="muscle-bar-chart" class="muscle-chart">
+                                <!-- Bars will be injected dynamically -->
+                            </div>
+                            <div class="total-input-force" data-tooltip="Suma escalar aritmética de las fuerzas contráctiles de todos los músculos activos en la simulación.">
+                                <span>Suma de Fuerzas de Entrada (&Sigma;F<sub>i</sub>):</span>
+                                <strong id="res-total-input-force">0.0 N</strong>
+                            </div>
+                        </div>
+
+                        <!-- Warnings and Physical Integrity Checks -->
+                        <div id="physical-warnings" class="warnings-container">
+                            <!-- Dynamically generated alerts (e.g. unilateral tension, high joint loads) -->
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: STEP-BY-STEP CALCULATION -->
+                    <div id="tab-calculation" class="tab-content">
+                        <div class="math-intro-card">
+                            <p><i class="fa-solid fa-circle-question"></i> Aquí se detalla el paso a paso matemático de cómo se calculan las fuerzas a partir de los datos ingresados en el modelo.</p>
+                        </div>
+                        <div class="calculation-steps">
+                            
+                            <!-- Step 1: Input Forces -->
+                            <div class="step-card">
+                                <div class="step-num">1</div>
+                                <h4>Vectores de Fuerza Muscular</h4>
+                                <p>Cada músculo ejerce una fuerza de tracción dirigida desde su punto de inserción en la mandíbula (\(\vec{r}_i\)) hacia su punto de origen en el cráneo (\(\vec{o}_i\)). Definimos el <a class="glossary-link" onclick="switchTab('tab-glossary', 'term-vector')">vector de posición</a> y dirección \(\vec{d}_i = \vec{o}_i - \vec{r}_i\), y luego calculamos la <a class="glossary-link" onclick="switchTab('tab-glossary', 'term-unitvector')">dirección unitaria</a> \(\hat{u}_i = \frac{\vec{d}_i}{\|\vec{d}_i\|}\). La fuerza vectorial se obtiene por <a class="glossary-link" onclick="switchTab('tab-glossary', 'term-scalarmult')">multiplicación escalar-vector</a> \(\vec{F}_i = F_i \cdot \hat{u}_i\):</p>
+                                <div id="math-step-1" class="math-render-area"></div>
+                            </div>
+
+                            <!-- Step 2: Muscle Torques -->
+                            <div class="step-card">
+                                <div class="step-num">2</div>
+                                <h4>Torque Muscular Respecto a la ATM</h4>
+                                <p>El <a class="glossary-link" onclick="switchTab('tab-glossary', 'term-torque')">torque</a> o momento de giro de cada músculo respecto al cóndilo se calcula mediante el <a class="glossary-link" onclick="switchTab('tab-glossary', 'term-cross')">producto cruz</a> \(\vec{\tau}_i = \vec{r}_i \times \vec{F}_i\). Sumamos linealmente para obtener el torque muscular colectivo:</p>
+                                <div id="math-step-2" class="math-render-area"></div>
+                            </div>
+
+                            <!-- Step 3: Solve Bite Force -->
+                            <div class="step-card">
+                                <div class="step-num">3</div>
+                                <h4>Resolución de la Fuerza de Mordida (\(\vec{F}_B\))</h4>
+                                <div id="math-step-3-explanation"></div>
+                                <div id="math-step-3" class="math-render-area"></div>
+                            </div>
+
+                            <!-- Step 4: Solve Joint Reaction Forces -->
+                            <div class="step-card">
+                                <div class="step-num">4</div>
+                                <h4>Cálculo de Fuerzas de Reacción en la ATM</h4>
+                                <p>El equilibrio estático exige que \(\sum \vec{F} = 0\) y \(\sum \vec{\tau} = 0\). Resolviendo las fuerzas en los condilos izquierdo (\(\vec{F}_{JL}\)) y derecho (\(\vec{F}_{JR}\)) localizados en \([\mp w, 0, 0]\):</p>
+                                <div id="math-step-4" class="math-render-area"></div>
+                            </div>
+
+                            <!-- Step 5: Mechanical Advantage -->
+                            <div class="step-card">
+                                <div class="step-num">5</div>
+                                <h4>Ventaja Mecánica Global</h4>
+                                <p>La relación entre la magnitud de la fuerza útil de salida y la suma de esfuerzos aplicados:</p>
+                                <div id="math-step-5" class="math-render-area"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: GLOSSARY OF TERMS -->
+                    <div id="tab-glossary" class="tab-content">
+                        <div class="math-intro-card">
+                            <p><i class="fa-solid fa-book"></i> <strong>Glosario Biomecánico:</strong> Explicaciones conceptuales y matemáticas adaptadas para estudiantes.</p>
+                        </div>
+                        <div class="glossary-list" style="padding: 0.5rem 0.2rem; max-height: calc(100vh - 280px); overflow-y: auto;">
+                            
+                            <!-- Vector -->
+                            <div class="glossary-term-card" id="term-vector">
+                                <h4><i class="fa-solid fa-arrow-trend-up"></i> Vector (Magnitud Vectorial)</h4>
+                                <p>Un <strong>vector</strong> es una entidad matemática que tiene tanto <strong>magnitud</strong> (longitud o intensidad) como <strong>dirección</strong> y <strong>sentido</strong> en el espacio.</p>
+                                <p><strong>Nomenclatura:</strong> Se representa con una letra y una flecha superior (ej. \(\vec{F}\)) o en negrita (ej. \(\mathbf{F}\)). En 3D, se escribe mediante sus componentes cartesianas: \(\vec{v} = [v_x, v_y, v_z]^T\), donde \(T\) significa transposición (es un vector columna).</p>
+                                <p><strong>En la mandíbula:</strong> Cada fuerza muscular se modela como un vector \(\vec{F}_i\). Además, la posición de los dientes (mordida) y las articulaciones (cóndilos ATM) se expresan mediante vectores de posición \(\vec{r}_i\) medidos en milímetros desde el origen (el cóndilo izquierdo en nuestra simplificación).</p>
+                            </div>
+
+                            <!-- Vector Unitario -->
+                            <div class="glossary-term-card" id="term-unitvector">
+                                <h4><i class="fa-solid fa-compass"></i> Vector Unitario (Dirección Unitaria)</h4>
+                                <p>Un <strong>vector unitario</strong> es un vector cuya magnitud es exactamente igual a <strong>1</strong>. Su único propósito es indicar una dirección pura en el espacio tridimensional.</p>
+                                <p><strong>Nomenclatura:</strong> Se denota típicamente con un acento circunflejo o "sombrero" (ej. \(\hat{u}\)). Se obtiene dividiendo cualquier vector dirección entre su propia norma o longitud: \(\hat{u} = \frac{\vec{d}}{\|\vec{d}\|}\).</p>
+                                <p><strong>En la mandíbula:</strong> Nos indica hacia dónde tira cada músculo. Para el músculo temporal, restamos su origen craneal de su inserción mandibular para obtener la distancia \(\vec{d}\), y lo dividimos por su norma para obtener \(\hat{u}_{\text{temp}}\).</p>
+                            </div>
+
+                            <!-- Producto Escalar-Vector -->
+                            <div class="glossary-term-card" id="term-scalarmult">
+                                <h4><i class="fa-solid fa-expand"></i> Producto Escalar-Vector</h4>
+                                <p>Es la operación que multiplica un número simple (escalar \(k\)) por un vector (\(\vec{v}\)). El resultado es un nuevo vector que apunta en la misma dirección pero cuya longitud se ha multiplicado por \(k\):</p>
+                                <p>$$k \cdot \vec{v} = [k \cdot v_x, \; k \cdot v_y, \; k \cdot v_z]^T$$</p>
+                                <p><strong>En la mandíbula:</strong> Multiplicamos los Newtons estimados de fuerza del músculo (escalar \(F_i\)) por su vector de dirección unitario (\(\hat{u}_i\)) para obtener la fuerza vectorial tridimensional: \(\vec{F}_i = F_i \cdot \hat{u}_i\).</p>
+                            </div>
+
+                            <!-- Torque -->
+                            <div class="glossary-term-card" id="term-torque">
+                                <h4><i class="fa-solid fa-rotate"></i> Torque (Momento de Fuerza)</h4>
+                                <p>El <strong>torque</strong> (\(\vec{\tau}\)) mide la tendencia de una fuerza aplicada a causar la <strong>rotación</strong> de un cuerpo alrededor de un punto o eje de giro.</p>
+                                <p><strong>Nomenclatura:</strong> Se representa con la letra griega tau (\(\vec{\tau}\)). Es el producto cruz entre el vector de posición del punto de aplicación (\(\vec{r}\)) y el vector de la fuerza aplicada (\(\vec{F}\)): \(\vec{\tau} = \vec{r} \times \vec{F}\). Su unidad es Newtons-milímetro (\(\text{N}\cdot\text{mm}\)) o Newtons-metro (\(\text{N}\cdot\text{m}\)).</p>
+                                <p><strong>En la mandíbula:</strong> Cuando los músculos tiran hacia arriba, intentan hacer rotar la mandíbula alrededor de la articulación temporomandibular (ATM), que actúa como eje de bisagra. Esto genera torques rotacionales.</p>
+                            </div>
+
+                            <!-- Producto Cruz -->
+                            <div class="glossary-term-card" id="term-cross">
+                                <h4><i class="fa-solid fa-table-cells-hashes"></i> Producto Cruz (Vectorial)</h4>
+                                <p>El <strong>producto cruz</strong> (\(\vec{A} \times \vec{B}\)) toma dos vectores y devuelve un <strong>tercer vector</strong> que es perpendicular a ambos.</p>
+                                <p><strong>Nomenclatura:</strong> Se escribe con el símbolo de aspa \(\times\). Su magnitud depende del ángulo entre los vectores y es igual a \(\|\vec{A}\| \|\vec{B}\| \sin\alpha\). Se calcula como:</p>
+                                <p>$$\vec{A} \times \vec{B} = \begin{bmatrix} A_y B_z - A_z B_y \\ A_z B_x - A_x B_z \\ A_x B_y - A_y B_x \end{bmatrix}$$</p>
+                                <p><strong>En la mandíbula:</strong> Sirve para calcular el torque tridimensional. El torque del músculo temporal es el producto cruz entre el brazo de palanca \(\vec{r}\) y la fuerza vectorial muscular \(\vec{F}\).</p>
+                            </div>
+
+                            <!-- Producto Punto -->
+                            <div class="glossary-term-card" id="term-dot">
+                                <h4><i class="fa-solid fa-calculator"></i> Producto Punto (Escalar)</h4>
+                                <p>El <strong>producto punto</strong> (\(\vec{A} \cdot \vec{B}\)) es una operation que multiplica dos vectores y devuelve un <strong>número escalar</strong>. Mide qué tan alineados están dos vectores.</p>
+                                <p><strong>Nomenclatura:</strong> Se escribe con un punto centrado \(\cdot\). Matemáticamente es: \(\vec{A} \cdot \vec{B} = A_x B_x + A_y B_y + A_z B_z\). Si los vectores son perpendiculares, su producto punto es cero.</p>
+                                <p><strong>En la mandíbula:</strong> Sirve para proyectar fuerzas tridimensionales en direcciones específicas (por ejemplo, para hallar cuánta fuerza útil de mordida actúa alineada a los dientes).</p>
+                            </div>
+
+                            <!-- Ventaja Mecánica -->
+                            <div class="glossary-term-card" id="term-ma">
+                                <h4><i class="fa-solid fa-gauge-high"></i> Ventaja Mecánica (Mechanical Advantage, MA)</h4>
+                                <p>La <strong>Ventaja Mecánica</strong> es el factor por el cual una máquina o sistema biológico amplifica la fuerza de entrada. Es la relación: \(\text{MA} = \frac{\text{Fuerza de Salida}}{\text{Fuerza de Entrada}}\).</p>
+                                <p><strong>Palancas en biomecánica:</strong></p>
+                                <ul>
+                                    <li><strong>MA > 1:</strong> Multiplica la fuerza a costa de menor velocidad o desplazamiento (ej. palanca de 2ª clase).</li>
+                                    <li><strong>MA < 1:</strong> Sacrifica fuerza de entrada a cambio de mayor velocidad y rango de movimiento en el extremo (ej. palanca de 3ª clase).</li>
+                                </ul>
+                                <p><strong>En la mandíbula:</strong> Funciona como una palanca de 3ª clase. La fuerza de los músculos temporales y maseteros se aplica más cerca de la articulación (ATM) que de los dientes. Por ello, la ventaja mecánica global es menor a 1 (típicamente entre 0.3 y 0.5), requiriendo esfuerzos de tracción grandes para morder.</p>
+                            </div>
+
+                            <!-- Equilibrio Estático -->
+                            <div class="glossary-term-card" id="term-static">
+                                <h4><i class="fa-solid fa-scale-balanced"></i> Equilibrio Estático y Cálculo Matricial</h4>
+                                <p>Para que un sistema esté en reposo (estático), la suma de todas las fuerzas externas y la suma de todos los torques respecto a cualquier punto deben ser nulas:</p>
+                                <p>$$\sum \vec{F} = 0 \quad \text{y} \quad \sum \vec{\tau} = 0$$</p>
+                                <p>Esto da lugar a un sistema de 6 ecuaciones escalares lineales combinadas (3 de fuerzas y 3 de torques) en un espacio 3D.</p>
+                                <p><strong>En la mandíbula:</strong> Conocidas las fuerzas de tracción de los músculos activos, resolvemos el sistema matricial para calcular la fuerza de mordida reactiva en el alimento y las fuerzas de reacción condilar resultantes que actúan en la ATM izquierda y derecha para mantener el cráneo en equilibrio estático.</p>
+                            </div>
+
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+        </main>
+
+        <footer class="app-footer">
+            <p>&copy; 2026 MandibulaMechanics 3D. Desarrollado con propósitos educativos. Antigravity AI Engine.</p>
+        </footer>
+    </div>
+
+    <!-- Application Script -->
+    <script src="app.js"></script>
+</body>
+</html>
