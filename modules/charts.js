@@ -1,6 +1,7 @@
 // Lightweight SVG charts (no dependencies). Colours come from CSS classes so both themes work.
 import { TOOTH_CENTERS } from './model.js';
 import { rotateOpen } from './math.js';
+import { t } from './i18n.js';
 
 /**
  * Bite force and joint loads as the bite point travels along the dental arch.
@@ -41,8 +42,8 @@ export function renderSweepChart(el, data, current, onPick) {
         grid += `<text class="c-tick" x="${m.l - 6}" y="${Y(v) + 3.5}" text-anchor="end">${v}</text>`;
     }
     const ticks = [
-        [-TOOTH_CENTERS[5], 'M1 I'], [-TOOTH_CENTERS[2], 'C I'], [0, 'Inc.'],
-        [TOOTH_CENTERS[2], 'C D'], [TOOTH_CENTERS[5], 'M1 D']
+        [-TOOTH_CENTERS[5], `M1 ${t('chart.tick.L')}`], [-TOOTH_CENTERS[2], `${t('chart.tick.C')} ${t('chart.tick.L')}`], [0, t('chart.tick.inc')],
+        [TOOTH_CENTERS[2], `${t('chart.tick.C')} ${t('chart.tick.R')}`], [TOOTH_CENTERS[5], `M1 ${t('chart.tick.R')}`]
     ];
     let xt = '';
     ticks.forEach(([t, label]) => {
@@ -60,10 +61,10 @@ export function renderSweepChart(el, data, current, onPick) {
     }
 
     el.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Fuerza de mordida y cargas articulares según la posición de mordida">
+    <svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="${t('chart.sweep.aria')}">
       ${bands}${grid}${xt}
       <text class="c-axis" x="${m.l - 30}" y="${m.t - 2}">N</text>
-      <text class="c-axis" x="${W - m.r}" y="${H - 4}" text-anchor="end">izquierda ← posición en el arco → derecha</text>
+      <text class="c-axis" x="${W - m.r}" y="${H - 4}" text-anchor="end">${t('chart.sweep.axis')}</text>
       <path class="c-line c-jl" d="${line('JL')}"/>
       <path class="c-line c-jr" d="${line('JR')}"/>
       <path class="c-line c-bite" d="${line('FB')}"/>
@@ -113,12 +114,12 @@ export function renderTriangleChart(el, res, posed) {
         const lbl = (v) => `<tspan class="${v < 0 ? 'neg' : ''}">${v.toFixed(2)}</tspan>`;
         mEl = `<circle class="t-m" cx="${X(res.M[0])}" cy="${Y(res.M[1])}" r="5"/>
             <text class="t-label t-mlabel" x="${X(res.M[0]) + 8}" y="${Y(res.M[1]) + 4}">M</text>`;
-        lambdas = `<text class="t-lambda" x="${X(-w)}" y="${Y(0) + 26}" text-anchor="middle">λ<tspan dy="3" font-size="8">I</tspan><tspan dy="-3"> = </tspan>${lbl(lL)}</text>
-            <text class="t-lambda" x="${X(w)}" y="${Y(0) + 26}" text-anchor="middle">λ<tspan dy="3" font-size="8">D</tspan><tspan dy="-3"> = </tspan>${lbl(lR)}</text>
+        lambdas = `<text class="t-lambda" x="${X(-w)}" y="${Y(0) + 26}" text-anchor="middle">λ<tspan dy="3" font-size="8">${t('sub.L')}</tspan><tspan dy="-3"> = </tspan>${lbl(lL)}</text>
+            <text class="t-lambda" x="${X(w)}" y="${Y(0) + 26}" text-anchor="middle">λ<tspan dy="3" font-size="8">${t('sub.R')}</tspan><tspan dy="-3"> = </tspan>${lbl(lR)}</text>
             <text class="t-lambda" x="${X(B[0])}" y="${Y(B[1]) - 12}" text-anchor="middle">λ<tspan dy="3" font-size="8">B</tspan><tspan dy="-3"> = </tspan>${lbl(lB)}</text>`;
     }
     el.innerHTML = `
-    <svg viewBox="0 -4 ${W} ${H + 36}" class="chart chart-tri" role="img" aria-label="Triángulo de soporte en vista oclusal">
+    <svg viewBox="0 -4 ${W} ${H + 36}" class="chart chart-tri" role="img" aria-label="${t('chart.tri.aria')}">
       <polyline class="t-arch" points="${archPts.join(' ')}"/>
       <line class="t-hinge" x1="${X(-w - 10)}" x2="${X(w + 10)}" y1="${Y(0)}" y2="${Y(0)}"/>
       <polygon class="t-tri ${inside ? 'ok' : 'bad'}" points="${tri}"/>
@@ -127,11 +128,11 @@ export function renderTriangleChart(el, res, posed) {
       <circle class="t-bite" cx="${X(B[0])}" cy="${Y(B[1])}" r="5.5"/>
       ${mEl}
       ${lambdas}
-      <text class="t-label" x="${X(-w)}" y="${Y(0) + 13}" text-anchor="middle">ATM I</text>
-      <text class="t-label" x="${X(w)}" y="${Y(0) + 13}" text-anchor="middle">ATM D</text>
-      <text class="t-dir" x="${W / 2}" y="6" text-anchor="middle">▲ anterior</text>
-      <text class="t-dir" x="4" y="${H + 30}">izquierda</text>
-      <text class="t-dir" x="${W - 4}" y="${H + 30}" text-anchor="end">derecha</text>
+      <text class="t-label" x="${X(-w)}" y="${Y(0) + 13}" text-anchor="middle">${t('jointShort.L')}</text>
+      <text class="t-label" x="${X(w)}" y="${Y(0) + 13}" text-anchor="middle">${t('jointShort.R')}</text>
+      <text class="t-dir" x="${W / 2}" y="6" text-anchor="middle">${t('chart.anterior')}</text>
+      <text class="t-dir" x="4" y="${H + 30}">${t('chart.left')}</text>
+      <text class="t-dir" x="${W - 4}" y="${H + 30}" text-anchor="end">${t('chart.right')}</text>
     </svg>`;
 }
 

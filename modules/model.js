@@ -1,5 +1,6 @@
 // Anatomical model: reference geometry, muscles, dental arch and posing.
 import { vec, rotateOpen, solveStatics } from './math.js';
+import { t, cap } from './i18n.js';
 
 // Reference geometry the default coordinates are expressed in (mm).
 // X scales with w, Y and Z scale with L.
@@ -7,47 +8,50 @@ export const REF = { w: 50, L: 95 };
 
 export const MUSCLE_TYPES = [
     {
-        key: 'masseter', name: 'Masetero', abbr: 'MS', color: '#10b981', force: 150, active: true,
-        ins: [-47, 12, -46], ori: [-52, 34, -2],
-        desc: 'Del arco cigomático al ángulo mandibular. Es el elevador principal: tira hacia arriba y adelante.'
+        key: 'masseter', color: '#10b981', force: 150, active: true,
+        ins: [-47, 12, -46], ori: [-52, 34, -2]
     },
     {
-        key: 'temporalis', name: 'Temporal', abbr: 'TE', color: '#6366f1', force: 120, active: true,
-        ins: [-41, 27, -6], ori: [-52, 14, 52],
-        desc: 'De la fosa temporal a la apófisis coronoides. Eleva casi en vertical; sus fibras posteriores retruyen.'
+        key: 'temporalis', color: '#6366f1', force: 120, active: true,
+        ins: [-41, 27, -6], ori: [-52, 14, 52]
     },
     {
-        key: 'pterygoidMed', name: 'Pterigoideo medial', abbr: 'PM', color: '#f59e0b', force: 100, active: true,
-        ins: [-40, 8, -44], ori: [-14, 24, -8],
-        desc: 'De la fosa pterigoidea a la cara interna del ángulo. Eleva y lleva la mandíbula hacia la línea media.'
+        key: 'pterygoidMed', color: '#f59e0b', force: 100, active: true,
+        ins: [-40, 8, -44], ori: [-14, 24, -8]
     },
     {
-        key: 'pterygoidLat', name: 'Pterigoideo lateral', abbr: 'PL', color: '#ec4899', force: 40, active: false,
-        ins: [-44, 3, -4], ori: [-18, 26, -14],
-        desc: 'De la lámina pterigoidea lateral al cuello del cóndilo. Protruye y participa en la apertura; casi no eleva.'
+        key: 'pterygoidLat', color: '#ec4899', force: 40, active: false,
+        ins: [-44, 3, -4], ori: [-18, 26, -14]
     }
 ];
 
-export const SIDE_NAME = { L: 'izquierdo', R: 'derecho' };
-export const SIDE_TEX = { L: 'I', R: 'D' };
-
 export function createMuscles() {
-    return MUSCLE_TYPES.flatMap((t) => ['L', 'R'].map((side) => {
+    const muscles = MUSCLE_TYPES.flatMap((mt) => ['L', 'R'].map((side) => {
         const sx = side === 'L' ? 1 : -1; // reference coordinates are given for the left side (x < 0)
         return {
-            id: `${t.key}-${side}`,
-            type: t.key,
+            id: `${mt.key}-${side}`,
+            type: mt.key,
             side,
-            name: `${t.name} ${SIDE_NAME[side]}`,
-            tex: `\\mathrm{${t.abbr}}_{${SIDE_TEX[side]}}`,
-            tag: `${t.abbr}-${SIDE_TEX[side]}`,
-            color: t.color,
-            active: t.active,
-            force: t.force,
-            insRef: [t.ins[0] * sx, t.ins[1], t.ins[2]],
-            oriRef: [t.ori[0] * sx, t.ori[1], t.ori[2]]
+            color: mt.color,
+            active: mt.active,
+            force: mt.force,
+            insRef: [mt.ins[0] * sx, mt.ins[1], mt.ins[2]],
+            oriRef: [mt.ori[0] * sx, mt.ori[1], mt.ori[2]]
         };
     }));
+    localizeMuscles(muscles);
+    return muscles;
+}
+
+/** (Re)computes the language-dependent labels of each muscle: name, plain tag and LaTeX subscript. */
+export function localizeMuscles(muscles) {
+    muscles.forEach((m) => {
+        const abbr = t(`muscle.${m.type}.abbr`);
+        const sub = t(`sub.${m.side}`);
+        m.name = cap(t('muscle.full', { name: t(`muscle.${m.type}`), side: t(`side.${m.side}`) }));
+        m.tag = `${abbr}-${sub}`;
+        m.tex = `\\mathrm{${abbr}}_{${sub}}`;
+    });
 }
 
 export const toMM = (p, g) => [p[0] * g.w / REF.w, p[1] * g.L / REF.L, p[2] * g.L / REF.L];
@@ -55,13 +59,13 @@ export const fromMM = (p, g) => [p[0] * REF.w / g.w, p[1] * REF.L / g.L, p[2] * 
 
 // Mandibular teeth per side, from the midline backwards (mesiodistal/buccolingual widths in mm)
 export const TEETH = [
-    { name: 'Incisivo central', short: 'IC', md: 5.5, bl: 6.0, h: 9.5 },
-    { name: 'Incisivo lateral', short: 'IL', md: 6.0, bl: 6.2, h: 9.5 },
-    { name: 'Canino', short: 'C', md: 7.0, bl: 7.5, h: 11 },
-    { name: '1.er premolar', short: 'PM1', md: 7.0, bl: 7.8, h: 8.5 },
-    { name: '2.º premolar', short: 'PM2', md: 7.2, bl: 8.2, h: 8 },
-    { name: '1.er molar', short: 'M1', md: 11.0, bl: 10.5, h: 7.5 },
-    { name: '2.º molar', short: 'M2', md: 10.5, bl: 10.0, h: 7 }
+    { md: 5.5, bl: 6.0, h: 9.5 },
+    { md: 6.0, bl: 6.2, h: 9.5 },
+    { md: 7.0, bl: 7.5, h: 11 },
+    { md: 7.0, bl: 7.8, h: 8.5 },
+    { md: 7.2, bl: 8.2, h: 8 },
+    { md: 11.0, bl: 10.5, h: 7.5 },
+    { md: 10.5, bl: 10.0, h: 7 }
 ];
 const TOOTH_SUM = TEETH.reduce((a, t) => a + t.md, 0);
 // Arc-length fraction (0 = midline, 1 = distal end) of each tooth centre
@@ -116,14 +120,18 @@ export function makeArch(g) {
 }
 
 /** Readable description of a bite position t. */
-export function describeBite(t) {
-    const at = Math.abs(t);
-    if (at < 0.03) return 'Incisivos centrales (línea media)';
+export function describeBite(pos) {
+    const at = Math.abs(pos);
+    if (at < 0.03) return t('bite.midline');
     let best = 0;
     TOOTH_CENTERS.forEach((c, i) => {
         if (Math.abs(at - c) < Math.abs(at - TOOTH_CENTERS[best])) best = i;
     });
-    return `${TEETH[best].name} ${t < 0 ? 'izquierdo' : 'derecho'}`;
+    return toothName(best, pos < 0 ? 'L' : 'R');
+}
+
+export function toothName(i, side) {
+    return cap(t('tooth.full', { tooth: t(`tooth.${i}`), side: t(`side.${side}`) }));
 }
 
 export function biteDirection(bite, theta) {
@@ -192,34 +200,29 @@ export function sweepArch(state, n = 121) {
 
 export const SCENARIOS = [
     {
-        id: 'incisal', label: 'Mordida incisal',
-        hint: 'Morder con los incisivos y activación simétrica: palanca larga, ventaja mecánica baja.',
+        id: 'incisal',
         apply: (s) => { s.bite.t = 0; }
     },
     {
-        id: 'molar', label: 'Molar izquierdo',
-        hint: 'Mismo esfuerzo muscular, pero mordiendo con el 1.er molar izquierdo: brazo de palanca corto.',
+        id: 'molar',
         apply: (s) => { s.bite.t = -TOOTH_CENTERS[5]; }
     },
     {
-        id: 'molar-balance', label: 'Molar izq. · balance reducido',
-        hint: 'Molar izquierdo con los músculos del lado derecho (balance) al 50 %: la resultante se desplaza hacia el lado de trabajo.',
+        id: 'molar-balance',
         apply: (s) => {
             s.bite.t = -TOOTH_CENTERS[5];
             s.muscles.forEach((m) => { if (m.side === 'R') m.force = Math.round(m.force * 0.5); });
         }
     },
     {
-        id: 'distraction', label: 'Distracción articular',
-        hint: 'Canino izquierdo con solo los músculos derechos: la resultante sale del triángulo de soporte y la ATM izquierda tendría que «tirar».',
+        id: 'distraction',
         apply: (s) => {
             s.bite.t = -TOOTH_CENTERS[2];
             s.muscles.forEach((m) => { if (m.side === 'L') m.active = false; });
         }
     },
     {
-        id: 'open', label: 'Boca abierta 20°',
-        hint: 'Mordida incisal con 20° de apertura: cambian las líneas de acción de los músculos y sus brazos de palanca.',
+        id: 'open',
         apply: (s) => { s.bite.t = 0; s.theta = 20; }
     }
 ];

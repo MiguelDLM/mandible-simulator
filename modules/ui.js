@@ -1,25 +1,23 @@
 // DOM controls and result panels.
 import { vec } from './math.js';
-import { MUSCLE_TYPES, TEETH, TOOTH_CENTERS, SCENARIOS, describeBite, toMM, fromMM, getArch } from './model.js';
+import { MUSCLE_TYPES, TEETH, TOOTH_CENTERS, SCENARIOS, describeBite, toothName, toMM, fromMM, getArch } from './model.js';
 import { renderSweepChart, renderTriangleChart } from './charts.js';
+import { t, cap, fmt, lang } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
-const fmt = (x, d = 0) => {
-    const r = Number(x.toFixed(d));
-    return (r === 0 ? 0 : r).toLocaleString('es-ES', { minimumFractionDigits: d, maximumFractionDigits: d });
-};
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 let S = null; // app state
 let A = null; // actions
-const linked = Object.fromEntries(MUSCLE_TYPES.map((t) => [t.key, true]));
+let playing = false;
+const linked = Object.fromEntries(MUSCLE_TYPES.map((mt) => [mt.key, true]));
 
 export function initUI(state, actions) {
     S = state;
     A = actions;
-    buildScenarios();
-    buildMuscles();
-    buildStepIndex();
+    bindScenarios();
+    bindMuscles();
+    bindStepIndex();
     bindBite();
     bindGeometry();
     bindTabs();
@@ -29,6 +27,7 @@ export function initUI(state, actions) {
     $('btn-reset').addEventListener('click', () => A.reset());
     $('btn-theme').addEventListener('click', () => A.toggleTheme());
     $('btn-play').addEventListener('click', () => A.togglePlay());
+    document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => A.setLang(b.dataset.lang)));
     document.querySelectorAll('.seg [data-view]').forEach((b) => b.addEventListener('click', () => {
         document.querySelectorAll('.seg [data-view]').forEach((x) => x.classList.toggle('active', x === b));
         A.setView(b.dataset.view);
@@ -40,12 +39,26 @@ export function initUI(state, actions) {
         A.setViewOption(b.dataset.opt, on);
     }));
     $('vec-scale').addEventListener('input', (e) => A.setViewOption('scale', parseFloat(e.target.value)));
+    localizeUI();
 }
 
-// ---------------- builders ----------------
-function buildScenarios() {
+/** Regenerates every piece of UI whose text is built in JS (called on start and on language change). */
+export function localizeUI() {
+    renderScenarios();
+    renderMuscleCards();
+    renderStepIndex();
+    setPlayButton(playing);
+    archView = null;
+    document.querySelectorAll('[data-lang]').forEach((b) => {
+        const on = b.dataset.lang === lang;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on);
+    });
+}
+
+// ---------------- scenarios ----------------
+function bindScenarios() {
     const nav = $('scenarios');
-    nav.innerHTML = SCENARIOS.map((s) => `<button class="chip" data-sc="${s.id}" title="${esc(s.hint)}">${esc(s.label)}</button>`).join('');
     nav.addEventListener('click', (e) => {
         const b = e.target.closest('[data-sc]');
         if (!b) return;
@@ -54,43 +67,62 @@ function buildScenarios() {
     });
 }
 
+function renderScenarios() {
+    const nav = $('scenarios');
+    const active = nav.querySelector('.chip.active')?.dataset.sc;
+    nav.innerHTML = SCENARIOS.map((s) => `<button class="chip ${s.id === active ? 'active' : ''}" data-sc="${s.id}"
+        title="${esc(t(`sc.${s.id}.hint`))}">${esc(t(`sc.${s.id}`))}</button>`).join('');
+}
+
 export function clearScenario() {
     document.querySelectorAll('#scenarios .chip').forEach((c) => c.classList.remove('active'));
 }
 
-function buildMuscles() {
+// ---------------- muscles ----------------
+function renderMuscleCards() {
     const list = $('muscle-list');
-    list.innerHTML = MUSCLE_TYPES.map((t) => `
-        <div class="muscle-card" data-type="${t.key}" style="--mc:${t.color}">
+    const open = new Set([...list.querySelectorAll('details[open]')].map((d) => d.closest('.muscle-card').dataset.type));
+    list.innerHTML = MUSCLE_TYPES.map((mt) => {
+        const name = cap(t(`muscle.${mt.key}`));
+        return `
+        <div class="muscle-card" data-type="${mt.key}" style="--mc:${mt.color}">
             <div class="mc-head">
                 <span class="mc-dot"></span>
-                <strong>${t.name}</strong>
-                <button class="icon-btn mc-link on" data-link="${t.key}" title="Enlazar lados izquierdo y derecho (simetría)" aria-pressed="true"><i class="fa-solid fa-link"></i></button>
+                <strong>${name}</strong>
+                <button class="icon-btn mc-link ${linked[mt.key] ? 'on' : ''}" data-link="${mt.key}" title="${esc(t('mc.link'))}"
+                    aria-label="${esc(t('mc.link'))}" aria-pressed="${linked[mt.key]}"><i class="fa-solid fa-${linked[mt.key] ? 'link' : 'link-slash'}"></i></button>
             </div>
-            <p class="mc-desc">${t.desc}</p>
-            ${['L', 'R'].map((side) => `
-            <div class="mc-side" data-id="${t.key}-${side}">
-                <label class="switch" title="Activar/desactivar"><input type="checkbox" data-act><span></span></label>
-                <span class="mc-side-name">${side === 'L' ? 'Izq.' : 'Der.'}</span>
-                <input type="range" min="0" max="400" step="5" data-force aria-label="Fuerza ${t.name} ${side === 'L' ? 'izquierdo' : 'derecho'}">
+            <p class="mc-desc">${t(`muscle.${mt.key}.desc`)}</p>
+            ${['L', 'R'].map((side) => {
+                const full = S.muscles.find((m) => m.id === `${mt.key}-${side}`).name;
+                return `
+            <div class="mc-side" data-id="${mt.key}-${side}">
+                <label class="switch" title="${esc(t('mc.toggle'))}"><input type="checkbox" data-act aria-label="${esc(full)}"><span></span></label>
+                <span class="mc-side-name">${t(`side.short.${side}`)}</span>
+                <input type="range" min="0" max="400" step="5" data-force aria-label="${esc(t('mc.force', { name: full }))}">
                 <output class="mc-val" data-out></output>
-            </div>`).join('')}
-            <details class="mc-coords">
-                <summary>Inserción y origen (mm)</summary>
+            </div>`;
+            }).join('')}
+            <details class="mc-coords" ${open.has(mt.key) ? 'open' : ''}>
+                <summary>${t('mc.coords')}</summary>
                 <table class="coord-table">
                     <thead><tr><th></th><th>x</th><th>y</th><th>z</th></tr></thead>
                     <tbody>
                     ${['L', 'R'].map((side) => ['ins', 'ori'].map((kind) => `
-                        <tr data-id="${t.key}-${side}" data-kind="${kind}">
-                            <th>${kind === 'ins' ? 'Inserción' : 'Origen'} ${side === 'L' ? 'I' : 'D'}</th>
+                        <tr data-id="${mt.key}-${side}" data-kind="${kind}">
+                            <th>${t(kind === 'ins' ? 'mc.ins' : 'mc.ori')} ${t(`sub.${side}`)}</th>
                             ${[0, 1, 2].map((i) => `<td><input type="number" step="1" data-axis="${i}"></td>`).join('')}
                         </tr>`).join('')).join('')}
                     </tbody>
                 </table>
-                <p class="hint">Coordenadas con la boca cerrada. La inserción se mueve con la mandíbula; el origen está fijo en el cráneo.</p>
+                <p class="hint">${t('mc.coordsHint')}</p>
             </details>
-        </div>`).join('');
+        </div>`;
+    }).join('');
+}
 
+function bindMuscles() {
+    const list = $('muscle-list');
     list.addEventListener('input', (e) => {
         const row = e.target.closest('.mc-side');
         if (!row) return;
@@ -145,11 +177,14 @@ function setMuscle(m, patch) {
     A.changed();
 }
 
-function buildStepIndex() {
-    const idx = $('step-index');
-    idx.innerHTML = [...document.querySelectorAll('.step')].map((s, i) =>
-        `<button data-step="${s.id}"><b>${i}</b> ${s.dataset.title}</button>`).join('');
-    idx.addEventListener('click', (e) => {
+// ---------------- steps ----------------
+function renderStepIndex() {
+    $('step-index').innerHTML = [...document.querySelectorAll('.step')].map((s, i) =>
+        `<button data-step="${s.id}"><b>${i}</b> ${t(`step.${i}.short`)}</button>`).join('');
+}
+
+function bindStepIndex() {
+    $('step-index').addEventListener('click', (e) => {
         const b = e.target.closest('[data-step]');
         if (b) $(b.dataset.step).scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
@@ -159,6 +194,14 @@ function buildStepIndex() {
     });
 }
 
+function bindSteps() {
+    document.querySelectorAll('.step').forEach((s) => {
+        s.addEventListener('mouseenter', () => A.focusStep(s.dataset.focus));
+        s.addEventListener('mouseleave', () => A.focusStep(null));
+    });
+}
+
+// ---------------- bite, gape, geometry ----------------
 function bindBite() {
     $('bite-t').addEventListener('input', (e) => {
         S.bite.t = parseFloat(e.target.value);
@@ -205,10 +248,10 @@ function bindBite() {
         let best = 0;
         let bestD = Infinity;
         for (let i = 0; i <= 200; i++) {
-            const t = -1 + i / 100;
-            const q = archView.arch.point(t);
+            const pos = -1 + i / 100;
+            const q = archView.arch.point(pos);
             const d = Math.hypot(q[0] - p.x, -q[1] - p.y);
-            if (d < bestD) { bestD = d; best = t; }
+            if (d < bestD) { bestD = d; best = pos; }
         }
         if (bestD < 12) A.setBite(best);
     });
@@ -225,6 +268,7 @@ function bindGeometry() {
     });
 }
 
+// ---------------- tabs & glossary ----------------
 function bindTabs() {
     document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
 }
@@ -253,18 +297,13 @@ function bindGlossary() {
     });
 }
 
-function bindSteps() {
-    document.querySelectorAll('.step').forEach((s) => {
-        s.addEventListener('mouseenter', () => A.focusStep(s.dataset.focus));
-        s.addEventListener('mouseleave', () => A.focusStep(null));
-    });
-}
-
 // ---------------- sync state -> controls ----------------
+const biteText = () => (S.bite.custom ? t('bite.customOut') : describeBite(S.bite.t));
+
 export function syncControls() {
     const g = S.geom;
     $('bite-t').value = S.bite.t;
-    $('bite-t-out').textContent = S.bite.custom ? 'Personalizado' : describeBite(S.bite.t);
+    $('bite-t-out').textContent = biteText();
     $('bite-dir').value = S.bite.dirMode;
     $('bite-free').hidden = S.bite.dirMode !== 'free';
     ['alpha', 'beta'].forEach((k) => {
@@ -301,7 +340,7 @@ export function syncControls() {
     });
 
     $('muscle-chips').innerHTML = S.muscles.filter((m) => m.active && m.force > 0).map((m) =>
-        `<button class="m-chip ${m.id === S.selectedMuscle ? 'active' : ''}" data-mid="${m.id}" style="--c:${m.color}">${m.tag}</button>`).join('');
+        `<button class="m-chip ${m.id === S.selectedMuscle ? 'active' : ''}" data-mid="${m.id}" style="--c:${m.color}" title="${esc(m.name)}">${m.tag}</button>`).join('');
 }
 
 // ---------------- arch picker (top view of the lower teeth) ----------------
@@ -315,14 +354,14 @@ export function renderArchPicker(posed) {
         const s = arch.s;
         const teeth = [];
         [-1, 1].forEach((sx) => TEETH.forEach((tooth, i) => {
-            const t = sx * TOOTH_CENTERS[i];
-            const p = arch.point(t);
-            const tan = arch.tangent(t);
+            const pos = sx * TOOTH_CENTERS[i];
+            const p = arch.point(pos);
+            const tan = arch.tangent(pos);
             const ang = (Math.atan2(-tan[1], tan[0]) * 180) / Math.PI;
             const md = tooth.md * arch.toothScale * 0.9;
             const bl = tooth.bl * s;
-            teeth.push(`<rect class="tooth" data-t="${t.toFixed(4)}" x="${-md / 2}" y="${-bl / 2}" width="${md}" height="${bl}" rx="${Math.min(md, bl) * 0.35}"
-                transform="translate(${p[0].toFixed(2)} ${(-p[1]).toFixed(2)}) rotate(${ang.toFixed(1)})"><title>${tooth.name} ${sx < 0 ? 'izquierdo' : 'derecho'}</title></rect>`);
+            teeth.push(`<rect class="tooth" data-t="${pos.toFixed(4)}" x="${-md / 2}" y="${-bl / 2}" width="${md}" height="${bl}" rx="${Math.min(md, bl) * 0.35}"
+                transform="translate(${p[0].toFixed(2)} ${(-p[1]).toFixed(2)}) rotate(${ang.toFixed(1)})"><title>${esc(toothName(i, sx < 0 ? 'L' : 'R'))}</title></rect>`);
         }));
         const path = [];
         for (let i = 0; i <= 80; i++) {
@@ -333,12 +372,12 @@ export function renderArchPicker(posed) {
         const y0 = -S.geom.L - 9;
         const vw = 2 * a + 20;
         const vh = S.geom.L - arch.ym + 18;
-        el.innerHTML = `<svg viewBox="${x0} ${y0} ${vw} ${vh}" role="img" aria-label="Arcada inferior">
+        el.innerHTML = `<svg viewBox="${x0} ${y0} ${vw} ${vh}" role="img" aria-label="${esc(t('arch.svg'))}">
             <path class="arch-path" d="${path.join('')}"/>
             ${teeth.join('')}
             <circle class="arch-marker" r="3.2"/>
-            <text class="arch-side" x="${x0 + 2}" y="${y0 + vh - 3}">izq.</text>
-            <text class="arch-side" x="${x0 + vw - 2}" y="${y0 + vh - 3}" text-anchor="end">der.</text>
+            <text class="arch-side" x="${x0 + 2}" y="${y0 + vh - 3}">${t('arch.left')}</text>
+            <text class="arch-side" x="${x0 + vw - 2}" y="${y0 + vh - 3}" text-anchor="end">${t('arch.right')}</text>
         </svg>`;
         archView = { key, arch };
     }
@@ -360,13 +399,13 @@ export function renderResults(posed, res, sweep, heavy) {
     const jl = vec.norm(res.FJL);
     const jr = vec.norm(res.FJR);
     $('kpi-fb').innerHTML = res.singular ? '—' : `${fmt(res.FB)}<small> N</small>`;
-    $('kpi-fb-sub').textContent = S.bite.custom ? 'Punto personalizado' : describeBite(S.bite.t);
+    $('kpi-fb-sub').textContent = S.bite.custom ? t('kpi.custom') : describeBite(S.bite.t);
     $('kpi-ma').textContent = fmt(res.MA, 2);
-    $('kpi-ma-sub').textContent = `ΣF músculos = ${fmt(res.sumForces)} N`;
+    $('kpi-ma-sub').textContent = t('kpi.sumF', { v: fmt(res.sumForces) });
     const joint = (el, sub, F, mag) => {
         $(el).innerHTML = `${fmt(mag)}<small> N</small>`;
         const bad = F[2] > 1e-6;
-        $(sub).innerHTML = `<span class="badge ${bad ? 'bad' : 'ok'}">${bad ? 'distracción' : 'compresión'}</span> <span class="mono">[${F.map((v) => fmt(v)).join(', ')}]</span>`;
+        $(sub).innerHTML = `<span class="badge ${bad ? 'bad' : 'ok'}">${t(bad ? 'distraction' : 'compression')}</span> <span class="mono">[${F.map((v) => fmt(v)).join('; ')}]</span>`;
     };
     joint('kpi-jl', 'kpi-jl-sub', res.FJL, jl);
     joint('kpi-jr', 'kpi-jr-sub', res.FJR, jr);
@@ -376,15 +415,15 @@ export function renderResults(posed, res, sweep, heavy) {
 
     $('hud').innerHTML = `
         <div><span>F<sub>B</sub></span><b>${res.singular ? '—' : fmt(res.FB)} N</b></div>
-        <div><span>VM</span><b>${fmt(res.MA, 2)}</b></div>
-        <div class="${res.distractionL ? 'bad' : ''}"><span>ATM I</span><b>${fmt(jl)} N</b></div>
-        <div class="${res.distractionR ? 'bad' : ''}"><span>ATM D</span><b>${fmt(jr)} N</b></div>
+        <div><span>${t('hud.ma')}</span><b>${fmt(res.MA, 2)}</b></div>
+        <div class="${res.distractionL ? 'bad' : ''}"><span>${t('jointShort.L')}</span><b>${fmt(jl)} N</b></div>
+        <div class="${res.distractionR ? 'bad' : ''}"><span>${t('jointShort.R')}</span><b>${fmt(jr)} N</b></div>
         <div><span>θ</span><b>${fmt(S.theta, 1)}°</b></div>`;
 
     renderAlerts(res);
     if (!heavy) return;
 
-    renderSweepChart($('sweep-chart'), sweep, S.bite.custom ? null : S.bite.t, (t) => A.setBite(t));
+    renderSweepChart($('sweep-chart'), sweep, S.bite.custom ? null : S.bite.t, (pos) => A.setBite(pos));
     renderContrib(res);
     renderTriangleChart($('tri-chart-results'), res, posed);
 }
@@ -392,15 +431,15 @@ export function renderResults(posed, res, sweep, heavy) {
 function renderAlerts(res) {
     const out = [];
     if (res.muscles.length === 0) {
-        out.push(['info', 'fa-circle-info', 'No hay músculos activos, así que no hay fuerzas que equilibrar.']);
+        out.push(['info', 'fa-circle-info', t('alert.none')]);
     } else if (res.singular) {
-        out.push(['bad', 'fa-ban', 'La línea de acción de la mordida corta el eje de bisagra: no produce momento en X y no puede equilibrar a los músculos. Cambia la dirección o el punto de mordida.']);
+        out.push(['bad', 'fa-ban', t('alert.singular')]);
     } else if (res.noBite) {
-        out.push(['bad', 'fa-triangle-exclamation', `<b>F<sub>B</sub> &lt; 0:</b> los músculos activos tienden a <i>abrir</i> la boca, así que el alimento tendría que tirar del diente. No hay mordida posible con esta activación.`]);
+        out.push(['bad', 'fa-triangle-exclamation', t('alert.noBite')]);
     }
-    const sides = [res.distractionL && 'izquierda', res.distractionR && 'derecha'].filter(Boolean);
+    const sides = [res.distractionL && t('jointSide.L'), res.distractionR && t('jointSide.R')].filter(Boolean);
     if (sides.length && res.muscles.length && !res.singular) {
-        out.push(['warn', 'fa-arrows-up-to-line', `<b>Distracción en la ATM ${sides.join(' y ')}:</b> la articulación tendría que tirar en lugar de empujar. La resultante muscular cae fuera del triángulo de soporte (paso 9). Prueba a reducir los músculos del lado contrario al diente.`]);
+        out.push(['warn', 'fa-arrows-up-to-line', t('alert.distraction', { sides: sides.join(` ${t('and')} `) })]);
     }
     $('alerts').innerHTML = out.map(([k, icon, html]) => `<div class="alert ${k}"><i class="fa-solid ${icon}"></i><span>${html}</span></div>`).join('');
 }
@@ -408,7 +447,7 @@ function renderAlerts(res) {
 function renderContrib(res) {
     const el = $('contrib');
     if (!res.muscles.length) {
-        el.innerHTML = '<p class="caption">Sin músculos activos.</p>';
+        el.innerHTML = `<p class="caption">${t('contrib.none')}</p>`;
         return;
     }
     const total = res.Tm[0];
@@ -439,9 +478,10 @@ export function flashMuscleCard(id) {
     row.classList.add('flash');
 }
 
-export function setPlayButton(playing) {
-    $('btn-play').innerHTML = playing
-        ? '<i class="fa-solid fa-pause"></i><span>Pausar</span>'
-        : '<i class="fa-solid fa-play"></i><span>Animar apertura</span>';
-    $('btn-play').classList.toggle('playing', playing);
+export function setPlayButton(isPlaying) {
+    playing = isPlaying;
+    $('btn-play').innerHTML = isPlaying
+        ? `<i class="fa-solid fa-pause"></i><span>${t('pause')}</span>`
+        : `<i class="fa-solid fa-play"></i><span>${t('play')}</span>`;
+    $('btn-play').classList.toggle('playing', isPlaying);
 }

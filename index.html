@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mandíbula 3D · Biomecánica paso a paso</title>
-    <meta name="description" content="Modelo educativo de biomecánica animal: estática de la mandíbula de un mamífero, fuerza de mordida, reacciones en la ATM y la matemática explicada paso a paso.">
+    <meta name="description" content="">
     <script>
         // Apply the saved/system theme before first paint
         try {
@@ -31,59 +31,64 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<!-- All visible text lives in modules/locales/*.js and is injected through data-i18n attributes. -->
 <div class="app">
     <!-- ============ Header ============ -->
     <header class="topbar">
         <div class="brand">
             <div class="brand-mark"><i class="fa-solid fa-bone"></i></div>
             <div>
-                <h1>Mandíbula 3D</h1>
-                <p>Biomecánica de la mandíbula de un mamífero, paso a paso</p>
+                <h1 data-i18n="brand.title"></h1>
+                <p data-i18n="brand.sub"></p>
             </div>
         </div>
-        <nav class="scenarios" id="scenarios" aria-label="Escenarios de ejemplo"></nav>
+        <nav class="scenarios" id="scenarios" data-i18n-attr="aria-label:scenarios.aria"></nav>
         <div class="top-actions">
-            <button class="btn btn-ghost" id="btn-reset" title="Volver a los valores por defecto"><i class="fa-solid fa-rotate-left"></i><span>Restablecer</span></button>
-            <button class="btn btn-icon" id="btn-theme" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema"><i class="fa-solid fa-circle-half-stroke"></i></button>
+            <div class="seg lang-switch" role="group" data-i18n-attr="aria-label:btn.lang.aria">
+                <button data-lang="es" lang="es">ES</button>
+                <button data-lang="en" lang="en">EN</button>
+            </div>
+            <button class="btn btn-ghost" id="btn-reset" data-i18n-attr="title:btn.reset.title"><i class="fa-solid fa-rotate-left"></i><span data-i18n="btn.reset"></span></button>
+            <button class="btn btn-icon" id="btn-theme" data-i18n-attr="title:btn.theme.title;aria-label:btn.theme.title"><i class="fa-solid fa-circle-half-stroke"></i></button>
         </div>
     </header>
 
     <main class="workspace">
         <!-- ============ Controls ============ -->
-        <aside class="panel controls" aria-label="Parámetros del modelo">
+        <aside class="panel controls" data-i18n-attr="aria-label:controls.aria">
             <div class="panel-scroll">
                 <section class="ctl">
-                    <h2><span class="ctl-num">1</span> Punto de mordida</h2>
-                    <div id="arch-picker" class="arch-picker" aria-label="Arcada dental: haz clic en un diente"></div>
+                    <h2><span class="ctl-num">1</span> <span data-i18n="ctl.bite"></span></h2>
+                    <div id="arch-picker" class="arch-picker" data-i18n-attr="aria-label:arch.aria"></div>
                     <div class="field">
                         <div class="field-head">
-                            <label for="bite-t">Posición a lo largo del arco</label>
+                            <label for="bite-t" data-i18n="bite.pos"></label>
                             <output id="bite-t-out" class="pill"></output>
                         </div>
                         <input type="range" id="bite-t" min="-1" max="1" step="0.005" value="0">
                     </div>
                     <div class="field">
-                        <label for="bite-dir">Dirección de la reacción del alimento sobre la mandíbula</label>
+                        <label for="bite-dir" data-i18n="bite.dir"></label>
                         <select id="bite-dir">
-                            <option value="vertical">Vertical, hacia abajo (−Z)</option>
-                            <option value="occlusal">Perpendicular al plano oclusal</option>
-                            <option value="free">Inclinada (libre)</option>
+                            <option value="vertical" data-i18n="bite.dir.vertical"></option>
+                            <option value="occlusal" data-i18n="bite.dir.occlusal"></option>
+                            <option value="free" data-i18n="bite.dir.free"></option>
                         </select>
                     </div>
                     <div id="bite-free" class="field-grid" hidden>
                         <div class="field">
-                            <div class="field-head"><label for="bite-alpha">Inclinación anteroposterior α</label><output id="bite-alpha-out" class="pill">0°</output></div>
+                            <div class="field-head"><label for="bite-alpha" data-i18n="bite.alpha"></label><output id="bite-alpha-out" class="pill">0°</output></div>
                             <input type="range" id="bite-alpha" min="-35" max="35" step="1" value="0">
                         </div>
                         <div class="field">
-                            <div class="field-head"><label for="bite-beta">Inclinación lateral β</label><output id="bite-beta-out" class="pill">0°</output></div>
+                            <div class="field-head"><label for="bite-beta" data-i18n="bite.beta"></label><output id="bite-beta-out" class="pill">0°</output></div>
                             <input type="range" id="bite-beta" min="-35" max="35" step="1" value="0">
                         </div>
                         <p class="hint">\(\hat u_B \propto [\tan\beta,\ \tan\alpha,\ -1]\)</p>
                     </div>
                     <details class="adv">
-                        <summary>Coordenadas manuales del punto de mordida</summary>
-                        <label class="check"><input type="checkbox" id="bite-custom"> Usar un punto personalizado (boca cerrada)</label>
+                        <summary data-i18n="bite.manual"></summary>
+                        <label class="check"><input type="checkbox" id="bite-custom"> <span data-i18n="bite.custom"></span></label>
                         <div class="xyz">
                             <label>x<sub>B</sub><input type="number" id="bite-x" step="1"></label>
                             <label>y<sub>B</sub><input type="number" id="bite-y" step="1"></label>
@@ -93,96 +98,96 @@
                 </section>
 
                 <section class="ctl">
-                    <h2><span class="ctl-num">2</span> Apertura bucal</h2>
+                    <h2><span class="ctl-num">2</span> <span data-i18n="ctl.gape"></span></h2>
                     <div class="field">
-                        <div class="field-head"><label for="theta">Ángulo de apertura θ</label><output id="theta-out" class="pill">0°</output></div>
+                        <div class="field-head"><label for="theta" data-i18n="gape.theta"></label><output id="theta-out" class="pill">0°</output></div>
                         <input type="range" id="theta" min="0" max="25" step="0.5" value="0">
                     </div>
-                    <p class="hint">La mandíbula gira alrededor del eje de bisagra (X). Los orígenes musculares en el cráneo quedan fijos, así que cambian las líneas de acción.</p>
+                    <p class="hint" data-i18n="gape.hint"></p>
                 </section>
 
                 <section class="ctl">
-                    <h2><span class="ctl-num">3</span> Geometría</h2>
+                    <h2><span class="ctl-num">3</span> <span data-i18n="ctl.geom"></span></h2>
                     <div class="field">
-                        <div class="field-head"><label for="geom-w">Ancho intercondilar 2w</label><output id="geom-w-out" class="pill">100 mm</output></div>
+                        <div class="field-head"><label for="geom-w" data-i18n="geom.w"></label><output id="geom-w-out" class="pill">100 mm</output></div>
                         <input type="range" id="geom-w" min="80" max="130" step="1" value="100">
                     </div>
                     <div class="field">
-                        <div class="field-head"><label for="geom-L">Longitud eje–incisivos L</label><output id="geom-L-out" class="pill">95 mm</output></div>
+                        <div class="field-head"><label for="geom-L" data-i18n="geom.L"></label><output id="geom-L-out" class="pill">95 mm</output></div>
                         <input type="range" id="geom-L" min="70" max="120" step="1" value="95">
                     </div>
-                    <p class="hint">Las inserciones musculares se escalan proporcionalmente con la geometría.</p>
+                    <p class="hint" data-i18n="geom.hint"></p>
                 </section>
 
                 <section class="ctl">
-                    <h2><span class="ctl-num">4</span> Músculos</h2>
+                    <h2><span class="ctl-num">4</span> <span data-i18n="ctl.muscles"></span></h2>
                     <div id="muscle-list" class="muscle-list"></div>
                 </section>
             </div>
         </aside>
 
         <!-- ============ 3D viewer ============ -->
-        <section class="panel viewer-panel" aria-label="Visualización 3D">
+        <section class="panel viewer-panel" data-i18n-attr="aria-label:viewer.aria">
             <div class="viewer-toolbar">
-                <div class="seg" role="group" aria-label="Vista de cámara">
-                    <button data-view="iso" class="active">3/4</button>
-                    <button data-view="front">Frontal</button>
-                    <button data-view="side">Lateral</button>
-                    <button data-view="top">Superior</button>
+                <div class="seg" role="group" data-i18n-attr="aria-label:view.aria">
+                    <button data-view="iso" class="active" data-i18n="view.iso"></button>
+                    <button data-view="front" data-i18n="view.front"></button>
+                    <button data-view="side" data-i18n="view.side"></button>
+                    <button data-view="top" data-i18n="view.top"></button>
                 </div>
                 <div class="toolbar-group">
-                    <button class="toggle on" data-opt="labels" title="Etiquetas de fuerzas"><i class="fa-solid fa-tag"></i></button>
-                    <button class="toggle on" data-opt="bodies" title="Cuerpos musculares"><i class="fa-solid fa-grip-lines"></i></button>
-                    <button class="toggle on" data-opt="triangle" title="Triángulo de soporte"><i class="fa-solid fa-play fa-rotate-270"></i></button>
-                    <button class="toggle on" data-opt="axes" title="Ejes de referencia"><i class="fa-solid fa-arrows-up-down-left-right"></i></button>
-                    <label class="scale-ctl" title="Escala de las flechas (mm por N)">
+                    <button class="toggle on" data-opt="labels" data-i18n-attr="title:opt.labels;aria-label:opt.labels"><i class="fa-solid fa-tag"></i></button>
+                    <button class="toggle on" data-opt="bodies" data-i18n-attr="title:opt.bodies;aria-label:opt.bodies"><i class="fa-solid fa-grip-lines"></i></button>
+                    <button class="toggle on" data-opt="triangle" data-i18n-attr="title:opt.triangle;aria-label:opt.triangle"><i class="fa-solid fa-play fa-rotate-270"></i></button>
+                    <button class="toggle on" data-opt="axes" data-i18n-attr="title:opt.axes;aria-label:opt.axes"><i class="fa-solid fa-arrows-up-down-left-right"></i></button>
+                    <label class="scale-ctl" data-i18n-attr="title:opt.scale">
                         <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                        <input type="range" id="vec-scale" min="0.05" max="0.4" step="0.01" value="0.2">
+                        <input type="range" id="vec-scale" min="0.05" max="0.4" step="0.01" value="0.2" data-i18n-attr="aria-label:opt.scale">
                     </label>
-                    <button class="btn btn-primary btn-sm" id="btn-play"><i class="fa-solid fa-play"></i><span>Animar apertura</span></button>
+                    <button class="btn btn-primary btn-sm" id="btn-play"></button>
                 </div>
             </div>
             <div class="viewer" id="viewer">
                 <div class="hud" id="hud"></div>
                 <div class="legend">
-                    <span><i class="sw sw-muscle"></i>Músculo (tira)</span>
-                    <span><i class="sw sw-bite"></i>Mordida F<sub>B</sub></span>
-                    <span><i class="sw sw-jl"></i>ATM izq.</span>
-                    <span><i class="sw sw-jr"></i>ATM der.</span>
-                    <span><i class="sw sw-m"></i>Resultante R<sub>z</sub> en M</span>
+                    <span><i class="sw sw-muscle"></i><span data-i18n="legend.muscle"></span></span>
+                    <span><i class="sw sw-bite"></i><span data-i18n="legend.bite"></span></span>
+                    <span><i class="sw sw-jl"></i><span data-i18n="legend.jl"></span></span>
+                    <span><i class="sw sw-jr"></i><span data-i18n="legend.jr"></span></span>
+                    <span><i class="sw sw-m"></i><span data-i18n="legend.m"></span></span>
                 </div>
-                <div class="viewer-help"><i class="fa-solid fa-computer-mouse"></i> Arrastra para girar · rueda para zoom · clic en un diente para morder ahí</div>
+                <div class="viewer-help" data-i18n="viewer.help"></div>
             </div>
         </section>
 
         <!-- ============ Analysis ============ -->
-        <section class="panel analysis" aria-label="Análisis">
+        <section class="panel analysis" data-i18n-attr="aria-label:analysis.aria">
             <div class="tabs" role="tablist">
-                <button role="tab" class="tab active" data-tab="results" aria-selected="true"><i class="fa-solid fa-gauge"></i> Resultados</button>
-                <button role="tab" class="tab" data-tab="steps" aria-selected="false"><i class="fa-solid fa-square-root-variable"></i> Paso a paso</button>
-                <button role="tab" class="tab" data-tab="concepts" aria-selected="false"><i class="fa-solid fa-book-open"></i> Conceptos</button>
+                <button role="tab" class="tab active" data-tab="results" aria-selected="true" data-i18n="tab.results"></button>
+                <button role="tab" class="tab" data-tab="steps" aria-selected="false" data-i18n="tab.steps"></button>
+                <button role="tab" class="tab" data-tab="concepts" aria-selected="false" data-i18n="tab.concepts"></button>
             </div>
 
             <!-- Results -->
             <div class="tab-panel active" id="tab-results" role="tabpanel">
                 <div class="kpis">
                     <div class="kpi kpi-bite">
-                        <span class="kpi-label">Fuerza de mordida F<sub>B</sub></span>
+                        <span class="kpi-label" data-i18n="kpi.fb"></span>
                         <span class="kpi-value" id="kpi-fb">–</span>
                         <span class="kpi-sub" id="kpi-fb-sub"></span>
                     </div>
                     <div class="kpi kpi-ma">
-                        <span class="kpi-label">Ventaja mecánica</span>
+                        <span class="kpi-label" data-i18n="kpi.ma"></span>
                         <span class="kpi-value" id="kpi-ma">–</span>
                         <span class="kpi-sub" id="kpi-ma-sub"></span>
                     </div>
                     <div class="kpi kpi-jl">
-                        <span class="kpi-label">ATM izquierda ‖F<sub>JI</sub>‖</span>
+                        <span class="kpi-label" data-i18n="kpi.jl"></span>
                         <span class="kpi-value" id="kpi-jl">–</span>
                         <span class="kpi-sub" id="kpi-jl-sub"></span>
                     </div>
                     <div class="kpi kpi-jr">
-                        <span class="kpi-label">ATM derecha ‖F<sub>JD</sub>‖</span>
+                        <span class="kpi-label" data-i18n="kpi.jr"></span>
                         <span class="kpi-value" id="kpi-jr">–</span>
                         <span class="kpi-sub" id="kpi-jr-sub"></span>
                     </div>
@@ -191,203 +196,134 @@
 
                 <article class="card">
                     <header class="card-head">
-                        <h3>Fuerza según el diente con que se muerde</h3>
-                        <div class="chart-legend"><span class="lg lg-bite">F<sub>B</sub></span><span class="lg lg-jl">‖F<sub>JI</sub>‖</span><span class="lg lg-jr">‖F<sub>JD</sub>‖</span><span class="lg lg-band">no admisible</span></div>
+                        <h3 data-i18n="card.sweep"></h3>
+                        <div class="chart-legend" data-i18n="card.sweep.legend"></div>
                     </header>
                     <div id="sweep-chart"></div>
-                    <p class="caption">Misma activación muscular y distinto punto de mordida. Haz clic en la gráfica para mover la mordida.</p>
+                    <p class="caption" data-i18n="card.sweep.caption"></p>
                 </article>
 
                 <article class="card">
-                    <header class="card-head"><h3>Aporte de cada músculo al momento de cierre</h3></header>
+                    <header class="card-head"><h3 data-i18n="card.contrib"></h3></header>
                     <div id="contrib"></div>
-                    <p class="caption">\(\tau_{x,i} = F_i\,b_i\): cuánto contribuye cada músculo a cerrar la mandíbula alrededor del eje de bisagra. Un músculo con mucha fuerza pero brazo \(b_i\) corto aporta poco.</p>
+                    <p class="caption" data-i18n="card.contrib.caption"></p>
                 </article>
 
                 <article class="card">
-                    <header class="card-head"><h3>Triángulo de soporte (vista oclusal)</h3></header>
+                    <header class="card-head"><h3 data-i18n="card.tri"></h3></header>
                     <div id="tri-chart-results"></div>
-                    <p class="caption">Si el punto <b>M</b>, donde actúa la resultante muscular vertical, cae dentro del triángulo ATM I–ATM D–mordida, las dos articulaciones quedan comprimidas. Detalle en el paso 9.</p>
+                    <p class="caption" data-i18n="card.tri.caption"></p>
                 </article>
             </div>
 
             <!-- Steps -->
             <div class="tab-panel" id="tab-steps" role="tabpanel">
                 <div class="steps-toolbar">
-                    <span>Músculo detallado:</span>
+                    <span data-i18n="steps.muscle"></span>
                     <div id="muscle-chips" class="chips"></div>
                 </div>
-                <nav class="step-index" id="step-index" aria-label="Índice de pasos"></nav>
+                <nav class="step-index" id="step-index" data-i18n-attr="aria-label:steps.index"></nav>
 
-                <article class="step" id="step-0" data-focus="jaw,bite,joints,hinge" data-title="Planteamiento">
+                <article class="step" id="step-0" data-focus="jaw,bite,joints,hinge">
                     <div class="step-num">0</div>
-                    <h3>Planteamiento: un cuerpo rígido en equilibrio</h3>
-                    <p>Tratamos la mandíbula como un <a class="gl" data-term="term-rigid">cuerpo rígido</a> en <a class="gl" data-term="term-static">equilibrio estático</a>: no acelera, así que la suma de fuerzas y la suma de momentos sobre ella son nulas.</p>
-                    <p><b>Sistema de referencia:</b> origen en el punto medio entre los cóndilos; <span class="ax ax-x">X</span> lateral (+ hacia la derecha del animal), <span class="ax ax-y">Y</span> anteroposterior (+ hacia delante) y <span class="ax ax-z">Z</span> vertical (+ hacia arriba). Los cóndilos quedan sobre el eje X, que es el <b>eje de bisagra</b>.</p>
-                    <p><b>Fuerzas sobre la mandíbula:</b></p>
-                    <ul>
-                        <li>Músculos \(\vec F_i\): <i>conocidas</i> (magnitud elegida y dirección dada por la anatomía).</li>
-                        <li>Mordida \(\vec F_B = F_B\,\hat u_B\): dirección conocida, magnitud \(F_B\) <i>desconocida</i> (1 incógnita).</li>
-                        <li>Reacciones de las ATM \(\vec F_{JI},\ \vec F_{JD}\): <i>desconocidas</i> (3 + 3 incógnitas).</li>
-                    </ul>
-                    $$\sum_i \vec F_i + F_B\,\hat u_B + \vec F_{JI} + \vec F_{JD} = \vec 0$$
-                    $$\sum_i \vec r_i\times\vec F_i + \vec r_B\times\vec F_B + \vec r_{JI}\times\vec F_{JI} + \vec r_{JD}\times\vec F_{JD} = \vec 0$$
-                    <p>Son 6 ecuaciones escalares para 7 incógnitas: el problema es <a class="gl" data-term="term-indeterminate">hiperestático</a> de grado 1. Nada en las ecuaciones decide cómo se reparten las ATM el empuje lateral, así que añadimos el supuesto \(F_{JI,x} = F_{JD,x}\).</p>
-                    <p class="data-label">Datos actuales:</p>
+                    <h3 data-i18n="step.0.title"></h3>
+                    <div data-i18n="step.0.body"></div>
+                    <p class="data-label" data-i18n="steps.data"></p>
                     <div class="math" id="s0-data"></div>
                     <div class="subnote" id="s0-rotation" hidden><p class="rot-text"></p><div class="math rot-math"></div></div>
                 </article>
 
-                <p class="empty-note" id="steps-empty" hidden><i class="fa-solid fa-circle-info"></i> No hay músculos activos: sin fuerzas musculares no hay nada que equilibrar. Activa alguno en el panel izquierdo.</p>
+                <p class="empty-note" id="steps-empty" hidden data-i18n="steps.empty"></p>
 
-                <article class="step needs-muscle" id="step-1" data-focus="muscle" data-title="Direcciones">
+                <article class="step needs-muscle" id="step-1" data-focus="muscle">
                     <div class="step-num">1</div>
-                    <h3>Dirección de tracción de cada músculo</h3>
-                    <p>Un músculo tira de su inserción en la mandíbula \(\vec r\) hacia su origen en el cráneo \(\vec o\). Restando obtenemos el <a class="gl" data-term="term-vector">vector</a> \(\vec d = \vec o - \vec r\), y al dividirlo por su longitud, el <a class="gl" data-term="term-unit">vector unitario</a> \(\hat u\), que solo indica la dirección.</p>
+                    <h3 data-i18n="step.1.title"></h3>
+                    <div data-i18n="step.1.body"></div>
                     <div class="math" id="s1-detail"></div>
-                    <details class="all"><summary>Todos los músculos activos</summary><div id="s1-table"></div></details>
+                    <details class="all"><summary data-i18n="steps.all"></summary><div id="s1-table"></div></details>
                 </article>
 
-                <article class="step needs-muscle" id="step-2" data-focus="muscles" data-title="Fuerzas">
+                <article class="step needs-muscle" id="step-2" data-focus="muscles">
                     <div class="step-num">2</div>
-                    <h3>Vector fuerza de cada músculo</h3>
-                    <p>La fuerza es la magnitud (en N) por la dirección, una <a class="gl" data-term="term-scalar">multiplicación escalar por vector</a>. La suma de todas es la <b>resultante muscular</b> \(\vec R = \sum_i \vec F_i\).</p>
+                    <h3 data-i18n="step.2.title"></h3>
+                    <div data-i18n="step.2.body"></div>
                     <div class="math" id="s2-detail"></div>
-                    <details class="all"><summary>Todos los músculos activos y resultante</summary><div id="s2-table"></div></details>
+                    <details class="all"><summary data-i18n="steps.allR"></summary><div id="s2-table"></div></details>
                 </article>
 
-                <article class="step needs-muscle" id="step-3" data-focus="lever" data-title="Momentos">
+                <article class="step needs-muscle" id="step-3" data-focus="lever">
                     <div class="step-num">3</div>
-                    <h3>Momento de cada músculo respecto al origen</h3>
-                    <p>El <a class="gl" data-term="term-torque">momento</a> (torque) mide la tendencia a girar. Se calcula con el <a class="gl" data-term="term-cross">producto cruz</a> \(\vec\tau = \vec r\times\vec F\). Su componente X, \(\tau_x\), es lo que hace girar la mandíbula alrededor del eje de bisagra. Al dividirla por la fuerza obtenemos el <a class="gl" data-term="term-lever">brazo de momento efectivo</a> \(b = \tau_x / F\).</p>
+                    <h3 data-i18n="step.3.title"></h3>
+                    <div data-i18n="step.3.body"></div>
                     <div class="math" id="s3-detail"></div>
-                    <details class="all" open><summary>Todos los músculos: momentos y brazos</summary><div id="s3-table"></div></details>
-                    <p class="hint"><i class="fa-solid fa-cube"></i> En 3D se muestra la perpendicular desde el eje de bisagra a la línea de acción del músculo seleccionado.</p>
+                    <details class="all" open><summary data-i18n="steps.allTau"></summary><div id="s3-table"></div></details>
+                    <p class="hint" data-i18n="step.3.hint"></p>
                 </article>
 
-                <article class="step needs-muscle" id="step-4" data-focus="lever,bite" data-title="Mordida">
+                <article class="step needs-muscle" id="step-4" data-focus="lever,bite">
                     <div class="step-num">4</div>
-                    <h3>Fuerza de mordida: equilibrio de momentos alrededor del eje X</h3>
-                    <p>Truco clave: proyectamos \(\sum\vec\tau = \vec 0\) sobre el eje X. Como los cóndilos están <i>sobre</i> ese eje, \(\vec r_J = [\pm w, 0, 0]\) y su momento en X es \(0\cdot F_z - 0\cdot F_y = 0\). <b>Las ATM desaparecen de esta ecuación</b> y queda una sola incógnita:</p>
-                    $$T_{m,x} + F_B\,(\vec r_B\times\hat u_B)_x = 0$$
+                    <h3 data-i18n="step.4.title"></h3>
+                    <div data-i18n="step.4.body"></div>
                     <div class="math" id="s4-math"></div>
                     <div id="s4-lever"></div>
                 </article>
 
-                <article class="step needs-muscle" id="step-5" data-focus="bite" data-title="Momento mordida">
+                <article class="step needs-muscle" id="step-5" data-focus="bite">
                     <div class="step-num">5</div>
-                    <h3>Momento de la fuerza de mordida</h3>
-                    <p>Con \(\vec F_B\) conocida calculamos su momento completo. Su componente X cancela exactamente la de los músculos. Las componentes Y y Z sobrantes las tendrán que absorber las ATM.</p>
+                    <h3 data-i18n="step.5.title"></h3>
+                    <div data-i18n="step.5.body"></div>
                     <div class="math" id="s5-math"></div>
                 </article>
 
-                <article class="step needs-muscle" id="step-6" data-focus="joints" data-title="Lo que falta">
+                <article class="step needs-muscle" id="step-6" data-focus="joints">
                     <div class="step-num">6</div>
-                    <h3>Lo que deben aportar las articulaciones</h3>
-                    <p>Pasamos todo lo conocido al otro lado de las ecuaciones de equilibrio. Las dos ATM juntas deben aportar esta fuerza y este momento:</p>
-                    $$\vec F_{JI} + \vec F_{JD} = \vec F_{\text{net}}, \qquad \vec r_{JI}\times\vec F_{JI} + \vec r_{JD}\times\vec F_{JD} = \vec\tau_{\text{net}}$$
+                    <h3 data-i18n="step.6.title"></h3>
+                    <div data-i18n="step.6.body"></div>
                     <div class="math" id="s6-math"></div>
                 </article>
 
-                <article class="step needs-muscle" id="step-7" data-focus="joints" data-title="Reacciones ATM">
+                <article class="step needs-muscle" id="step-7" data-focus="joints">
                     <div class="step-num">7</div>
-                    <h3>Reacciones en cada ATM</h3>
-                    <p>Desarrollando los productos cruz con \(\vec r_{JI} = [-w,0,0]\) y \(\vec r_{JD} = [w,0,0]\):</p>
-                    $$\vec r_{JI}\times\vec F_{JI} + \vec r_{JD}\times\vec F_{JD} = \big[\,0,\ \ w(F_{JI,z}-F_{JD,z}),\ \ w(F_{JD,y}-F_{JI,y})\,\big]$$
-                    <p>Cada componente da un sistema de 2×2: la <b>suma</b> sale del equilibrio de fuerzas y la <b>diferencia</b> del equilibrio de momentos.</p>
-                    $$\begin{cases} F_{JI,z}+F_{JD,z} = F_{\text{net},z}\\ F_{JI,z}-F_{JD,z} = \tau_{\text{net},y}/w\end{cases}\qquad \begin{cases} F_{JI,y}+F_{JD,y} = F_{\text{net},y}\\ F_{JD,y}-F_{JI,y} = \tau_{\text{net},z}/w\end{cases}$$
+                    <h3 data-i18n="step.7.title"></h3>
+                    <div data-i18n="step.7.body"></div>
                     <div class="math" id="s7-math"></div>
                     <div id="s7-interp"></div>
                 </article>
 
-                <article class="step needs-muscle" id="step-8" data-focus="muscles,bite,joints" data-title="Verificación">
+                <article class="step needs-muscle" id="step-8" data-focus="muscles,bite,joints">
                     <div class="step-num">8</div>
-                    <h3>Verificación: ¿de verdad está en equilibrio?</h3>
-                    <p>Sumamos todas las fuerzas y momentos con los valores obtenidos. Ambos resultados deben ser cero, salvo errores de redondeo. Es la forma más honesta de comprobar que el cálculo es correcto.</p>
+                    <h3 data-i18n="step.8.title"></h3>
+                    <div data-i18n="step.8.body"></div>
                     <div class="math" id="s8-math"></div>
                 </article>
 
-                <article class="step needs-muscle" id="step-9" data-focus="triangle,bite,joints" data-title="Geometría">
+                <article class="step needs-muscle" id="step-9" data-focus="triangle,bite,joints">
                     <div class="step-num">9</div>
-                    <h3>Lectura geométrica: el triángulo de soporte</h3>
-                    <p>Toda la acción muscular vertical equivale a una sola fuerza \(R_z\) aplicada en un punto \(M\) del plano horizontal. Ese punto se elige para que produzca los mismos momentos \(\tau_x = y_M R_z\) y \(\tau_y = -x_M R_z\). Los tres apoyos (ATM I, ATM D y el diente) se reparten \(R_z\) según las <a class="gl" data-term="term-greaves">coordenadas baricéntricas</a> de \(M\) en su triángulo:</p>
+                    <h3 data-i18n="step.9.title"></h3>
+                    <div data-i18n="step.9.body"></div>
                     <div class="math" id="s9-math"></div>
-                    <p class="hint" id="s9-note" hidden><i class="fa-solid fa-triangle-exclamation"></i> La mordida no es vertical, así que el reparto baricéntrico es una aproximación. Los valores exactos son los del paso 7.</p>
+                    <p class="hint" id="s9-note" hidden data-i18n="step.9.note"></p>
                     <div id="tri-chart-steps"></div>
-                    <p>Si algún \(\lambda\) es negativo, \(M\) cae fuera del triángulo y ese apoyo tendría que tirar en lugar de empujar. Es la explicación geométrica de por qué, al morder con un molar, conviene activar menos los músculos del lado contrario (<i>lado de balance</i>).</p>
+                    <div data-i18n="step.9.after"></div>
                 </article>
             </div>
 
             <!-- Concepts -->
             <div class="tab-panel" id="tab-concepts" role="tabpanel">
-                <article class="concept intro">
-                    <h4><i class="fa-solid fa-compass"></i> Cómo usar este simulador</h4>
-                    <ol>
-                        <li>Elige un <b>escenario</b> arriba o mueve el <b>punto de mordida</b>: puedes hacer clic en un diente, en la arcada o en la gráfica.</li>
-                        <li>Ajusta la <b>fuerza de cada músculo</b>. El eslabón <i class="fa-solid fa-link"></i> mantiene simétricos los dos lados.</li>
-                        <li>Observa en <b>Resultados</b> cómo cambian la mordida y las cargas articulares, y sigue la <b>memoria de cálculo</b> en <i>Paso a paso</i>. Al pasar el ratón por un paso se resaltan en 3D los elementos que intervienen.</li>
-                    </ol>
-                </article>
-
-                <article class="concept" id="term-vector">
-                    <h4>Vector</h4>
-                    <p>Magnitud con dirección y sentido. En 3D se escribe por componentes, \(\vec v = [v_x, v_y, v_z]\). Aquí son vectores las posiciones (mm) y las fuerzas (N).</p>
-                </article>
-                <article class="concept" id="term-unit">
-                    <h4>Vector unitario</h4>
-                    <p>Vector de longitud 1 que solo indica dirección: \(\hat u = \vec d/\|\vec d\|\), con \(\|\vec d\| = \sqrt{d_x^2+d_y^2+d_z^2}\).</p>
-                </article>
-                <article class="concept" id="term-scalar">
-                    <h4>Multiplicación escalar por vector</h4>
-                    <p>\(k\,\vec v = [k v_x,\ k v_y,\ k v_z]\). Estira el vector sin cambiar su dirección. Así \(\vec F = F\,\hat u\) convierte «150 N en esta dirección» en un vector.</p>
-                </article>
-                <article class="concept" id="term-torque">
-                    <h4>Momento (torque)</h4>
-                    <p>Tendencia de una fuerza a hacer girar un cuerpo respecto a un punto: \(\vec\tau = \vec r\times\vec F\), en N·mm. La componente \(\tau_x\) mide el giro alrededor del eje X. Según la regla de la mano derecha, \(\tau_x > 0\) <b>cierra</b> la boca (lleva +Y hacia +Z).</p>
-                </article>
-                <article class="concept" id="term-cross">
-                    <h4>Producto cruz</h4>
-                    <p>Devuelve un vector perpendicular a los dos factores, de módulo \(\|\vec a\|\|\vec b\|\sin\varphi\):</p>
-                    $$\vec a\times\vec b = \begin{vmatrix}\hat\imath&\hat\jmath&\hat k\\a_x&a_y&a_z\\b_x&b_y&b_z\end{vmatrix} = \begin{bmatrix}a_y b_z - a_z b_y\\ a_z b_x - a_x b_z\\ a_x b_y - a_y b_x\end{bmatrix}$$
-                </article>
-                <article class="concept" id="term-lever">
-                    <h4>Brazo de momento</h4>
-                    <p>Distancia perpendicular entre el eje de giro y la línea de acción de la fuerza, \(d_\perp\). Una misma fuerza hace más momento cuanto mayor es su brazo. Aquí usamos el brazo <i>efectivo</i> \(b = \tau_x/F\), que además descuenta la parte de la fuerza que no actúa en el plano sagital.</p>
-                </article>
-                <article class="concept" id="term-rigid">
-                    <h4>Cuerpo rígido</h4>
-                    <p>Idealización en la que las distancias entre puntos del cuerpo no cambian: el hueso no se deforma. Permite describir la mandíbula con posiciones fijas y aplicar el equilibrio al conjunto.</p>
-                </article>
-                <article class="concept" id="term-static">
-                    <h4>Equilibrio estático</h4>
-                    <p>\(\sum\vec F = \vec 0\) y \(\sum\vec\tau = \vec 0\): 6 ecuaciones escalares en 3D. Durante una mordida sostenida las aceleraciones son despreciables, así que es una buena aproximación.</p>
-                </article>
-                <article class="concept" id="term-indeterminate">
-                    <h4>Hiperestaticidad</h4>
-                    <p>Hay más incógnitas que ecuaciones de equilibrio. Aquí sobra una: el reparto lateral (X) entre las dos ATM. Resolverlo de verdad exigiría modelar la deformación de los tejidos. Por eso suponemos \(F_{JI,x} = F_{JD,x}\), que no afecta a \(F_B\) ni a las componentes Y y Z.</p>
-                </article>
-                <article class="concept" id="term-ma">
-                    <h4>Ventaja mecánica y palancas</h4>
-                    <p>\(\text{VM} = F_{\text{salida}}/F_{\text{entrada}} = F_B/\sum F_i\). Al morder, la mandíbula funciona como una <b>palanca de tercer género</b>: los músculos se insertan entre el fulcro (ATM) y la carga (diente), así que VM &lt; 1. A cambio se gana velocidad y recorrido en los dientes. Cuanto más atrás se muerde, más corto es el brazo de la carga y mayor la VM.</p>
-                </article>
-                <article class="concept" id="term-greaves">
-                    <h4>Triángulo de soporte (Greaves)</h4>
-                    <p>Los dos cóndilos y el punto de mordida forman un triángulo. Una placa apoyada en tres puntos y cargada en \(M\) reparte la carga según las coordenadas baricéntricas \(\lambda\) de \(M\), con \(\lambda_I+\lambda_D+\lambda_B = 1\). Si \(M\) sale del triángulo, algún \(\lambda\) se vuelve negativo y ese apoyo tendría que tirar. Greaves (1978) lo propuso para explicar cómo se organizan los músculos masticadores en distintos mamíferos.</p>
-                </article>
-                <article class="concept" id="term-distraction">
-                    <h4>Compresión vs. distracción articular</h4>
-                    <p>La fosa glenoidea solo puede <b>empujar</b> el cóndilo hacia abajo (\(F_z &lt; 0\), compresión). Si el cálculo da \(F_z &gt; 0\), la articulación tendría que separarse (<b>distracción</b>). En un animal real, los ligamentos y el control neuromuscular evitan esa situación ajustando la activación de los músculos.</p>
-                </article>
-                <article class="concept warn" id="term-limits">
-                    <h4><i class="fa-solid fa-flask"></i> Supuestos y límites del modelo</h4>
-                    <ul>
-                        <li>Cuerpo rígido en equilibrio estático, sin peso ni inercia.</li>
-                        <li>Cada músculo es una fuerza rectilínea entre dos puntos, con una magnitud que tú eliges (no se optimiza la activación).</li>
-                        <li>Cada ATM es un contacto puntual en el eje de bisagra. En la realidad la reacción sigue la pendiente de la eminencia articular y el cóndilo también se traslada.</li>
-                        <li>Reparto lateral 50/50 entre las ATM (grado de hiperestaticidad 1).</li>
-                        <li>Mamífero genérico: la geometría, las dimensiones y la dentición (incisivos, canino, premolares y molares) son simplificadas y orientativas, no las de una especie concreta. Ajusta la geometría para explorar otras proporciones.</li>
-                    </ul>
-                </article>
+                <article class="concept intro"><h4 data-i18n="c.howto.title"></h4><div data-i18n="c.howto.body"></div></article>
+                <article class="concept" id="term-vector"><h4 data-i18n="c.vector.title"></h4><div data-i18n="c.vector.body"></div></article>
+                <article class="concept" id="term-unit"><h4 data-i18n="c.unit.title"></h4><div data-i18n="c.unit.body"></div></article>
+                <article class="concept" id="term-scalar"><h4 data-i18n="c.scalar.title"></h4><div data-i18n="c.scalar.body"></div></article>
+                <article class="concept" id="term-torque"><h4 data-i18n="c.torque.title"></h4><div data-i18n="c.torque.body"></div></article>
+                <article class="concept" id="term-cross"><h4 data-i18n="c.cross.title"></h4><div data-i18n="c.cross.body"></div></article>
+                <article class="concept" id="term-lever"><h4 data-i18n="c.lever.title"></h4><div data-i18n="c.lever.body"></div></article>
+                <article class="concept" id="term-rigid"><h4 data-i18n="c.rigid.title"></h4><div data-i18n="c.rigid.body"></div></article>
+                <article class="concept" id="term-static"><h4 data-i18n="c.static.title"></h4><div data-i18n="c.static.body"></div></article>
+                <article class="concept" id="term-indeterminate"><h4 data-i18n="c.indet.title"></h4><div data-i18n="c.indet.body"></div></article>
+                <article class="concept" id="term-ma"><h4 data-i18n="c.ma.title"></h4><div data-i18n="c.ma.body"></div></article>
+                <article class="concept" id="term-greaves"><h4 data-i18n="c.greaves.title"></h4><div data-i18n="c.greaves.body"></div></article>
+                <article class="concept" id="term-distraction"><h4 data-i18n="c.distraction.title"></h4><div data-i18n="c.distraction.body"></div></article>
+                <article class="concept warn" id="term-limits"><h4 data-i18n="c.limits.title"></h4><div data-i18n="c.limits.body"></div></article>
             </div>
         </section>
     </main>

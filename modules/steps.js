@@ -1,6 +1,7 @@
 // Step-by-step derivation rendered with KaTeX, using the live numbers of the current configuration.
 /* global katex */
 import { vec } from './math.js';
+import { t } from './i18n.js';
 
 const num = (x, d = 1) => {
     const r = Number(x.toFixed(d));
@@ -38,12 +39,15 @@ export function renderSteps(state, posed, res, selectedId) {
     const sel = ms.find((m) => m.id === selectedId) || ms[0];
     const w = res.w;
     const thetaDeg = state.theta;
+    // Side subscripts depend on the language: I/D (izquierda/derecha) or L/R
+    const I = t('sub.L');
+    const D = t('sub.R');
 
     // ---- Step 0: data of the problem
     tex($('s0-data'), `\\begin{aligned}
         w &= ${num(w)}${MM}\\\\
-        \\vec r_{JI} &= ${row(res.rJL)}${MM}\\\\
-        \\vec r_{JD} &= ${row(res.rJR)}${MM}\\\\
+        \\vec r_{J${I}} &= ${row(res.rJL)}${MM}\\\\
+        \\vec r_{J${D}} &= ${row(res.rJR)}${MM}\\\\
         \\vec r_B &= ${row(res.rB)}${MM}\\\\
         \\hat u_B &= ${row(res.uB, 3)}
     \\end{aligned}`);
@@ -53,8 +57,7 @@ export function renderSteps(state, posed, res, selectedId) {
             rot.hidden = false;
             const c = Math.cos(posed.theta).toFixed(3);
             const s = Math.sin(posed.theta).toFixed(3);
-            rot.querySelector('.rot-text').innerHTML = `Con la boca abierta ${im(`\\theta = ${num(thetaDeg)}^\\circ`)}, cada punto de la mandíbula
-                (inserciones y punto de mordida) se rota alrededor del eje X antes de calcular; los orígenes en el cráneo no se mueven:`;
+            rot.querySelector('.rot-text').innerHTML = t('s.rotation', { theta: im(`\\theta = ${num(thetaDeg)}^\\circ`) });
             tex(rot.querySelector('.rot-math'), `\\vec r = \\begin{bmatrix}1&0&0\\\\0&\\cos\\theta&\\sin\\theta\\\\0&-\\sin\\theta&\\cos\\theta\\end{bmatrix}\\vec r_0
                 = \\begin{bmatrix}1&0&0\\\\0&${c}&${s}\\\\0&-${s}&${c}\\end{bmatrix}\\vec r_0`);
         } else {
@@ -76,7 +79,7 @@ export function renderSteps(state, posed, res, selectedId) {
         \\hat u_{${sel.tex}} &= \\frac{\\vec d}{\\|\\vec d\\|} = \\frac{${row(sel.d)}}{${num(sel.len)}}\\\\
         &= ${row(sel.u, 3)}
     \\end{aligned}`);
-    table($('s1-table'), ['Músculo', 'd (mm)', '‖d‖ (mm)', 'û'],
+    table($('s1-table'), [t('s.muscle'), 'd (mm)', '‖d‖ (mm)', 'û'],
         ms.map((m) => [chip(m), vcell(m.d), num(m.len), vcell(m.u, 3)]));
 
     // ---- Step 2: force vectors
@@ -84,7 +87,7 @@ export function renderSteps(state, posed, res, selectedId) {
         \\vec F_{${sel.tex}} &= F\\,\\hat u = ${num(sel.force, 0)}${N} \\cdot ${row(sel.u, 3)}\\\\
         &= \\left[\\,${num(sel.force, 0)}\\cdot${par(sel.u[0], 3)},\\ ${num(sel.force, 0)}\\cdot${par(sel.u[1], 3)},\\ ${num(sel.force, 0)}\\cdot${par(sel.u[2], 3)}\\,\\right] = ${row(sel.F)}${N}
     \\end{aligned}`);
-    table($('s2-table'), ['Músculo', 'F (N)', 'F⃗ (N)'],
+    table($('s2-table'), [t('s.muscle'), 'F (N)', 'F⃗ (N)'],
         ms.map((m) => [chip(m), num(m.force, 0), vcell(m.F)]),
         ['<b>Σ = R⃗</b>', num(res.sumForces, 0), vcell(res.R)]);
 
@@ -101,7 +104,7 @@ export function renderSteps(state, posed, res, selectedId) {
         \\end{bmatrix} = ${row(sel.tau, 0)}${NMM}\\\\[4pt]
         b_{${sel.tex}} &= \\frac{\\tau_x}{F} = \\frac{${num(sel.tau[0], 0)}}{${num(sel.force, 0)}} = ${num(sel.lever)}${MM}
     \\end{aligned}`);
-    table($('s3-table'), ['Músculo', 'τ⃗ (N·mm)', 'b (mm)', 'F·b = τₓ (N·mm)'],
+    table($('s3-table'), [t('s.muscle'), 'τ⃗ (N·mm)', 'b (mm)', 'F·b = τₓ (N·mm)'],
         ms.map((m) => [chip(m), vcell(m.tau, 0), num(m.lever), num(m.tau[0], 0)]),
         ['<b>Σ = T⃗ₘ</b>', vcell(res.Tm, 0), '', `<b>${num(res.Tm[0], 0)}</b>`]);
 
@@ -109,7 +112,7 @@ export function renderSteps(state, posed, res, selectedId) {
     const [xB, yB, zB] = res.rB;
     const uB = res.uB;
     if (res.singular) {
-        tex($('s4-math'), `y_B u_{Bz} - z_B u_{By} = 0 \\;\\Rightarrow\\; \\text{la mordida no genera momento en X: sin solución}`);
+        tex($('s4-math'), `y_B u_{Bz} - z_B u_{By} = 0 \\;\\Rightarrow\\; ${t('s.singular')}`);
         $('s4-lever').innerHTML = '';
     } else {
         tex($('s4-math'), `\\begin{aligned}
@@ -119,10 +122,13 @@ export function renderSteps(state, posed, res, selectedId) {
             \\vec F_B &= F_B\\,\\hat u_B = ${num(res.FB)} \\cdot ${row(uB, 3)}\\\\
             &= ${row(res.FBvec)}${N}
         \\end{aligned}`);
-        $('s4-lever').innerHTML = `<p>Es la <b>ley de la palanca</b> generalizada: el brazo de la mordida es
-            ${im(`b_B = -(\\vec r_B\\times\\hat u_B)_x = ${num(res.biteLever)}${MM}`)}${Math.abs(uB[0]) + Math.abs(uB[1]) < 1e-9 ? ` (con mordida vertical es simplemente ${im('y_B')})` : ''} y</p>
+        const vertical = Math.abs(uB[0]) + Math.abs(uB[1]) < 1e-9;
+        $('s4-lever').innerHTML = `<p>${t('s.lever1', {
+            bB: im(`b_B = -(\\vec r_B\\times\\hat u_B)_x = ${num(res.biteLever)}${MM}`),
+            vertical: vertical ? t('s.leverVertical', { yB: im('y_B') }) : ''
+        })}</p>
             ${katex.renderToString(`F_B = \\frac{\\sum_i F_i\\,b_i}{b_B} = \\frac{${num(res.Tm[0], 0)}${NMM}}{${num(res.biteLever)}${MM}} = ${num(res.FB)}${N}`, { displayMode: true, throwOnError: false })}
-            <p>Por eso morder atrás (menor ${im('b_B')}) produce más fuerza con el mismo esfuerzo muscular.</p>`;
+            <p>${t('s.lever2', { bB: im('b_B') })}</p>`;
     }
 
     // ---- Step 5: bite moment
@@ -148,28 +154,28 @@ export function renderSteps(state, posed, res, selectedId) {
     tex($('s7-math'), `\\begin{aligned}
         \\tfrac{\\tau_{\\text{net},y}}{w} &= \\tfrac{${num(tn[1], 0)}}{${num(w)}} = ${num(ty)}${N}, \\qquad
         \\tfrac{\\tau_{\\text{net},z}}{w} = \\tfrac{${num(tn[2], 0)}}{${num(w)}} = ${num(tz)}${N}\\\\[8pt]
-        F_{JI,z} &= \\tfrac12\\big(F_{\\text{net},z} + \\tfrac{\\tau_{\\text{net},y}}{w}\\big)\\\\
+        F_{J${I},z} &= \\tfrac12\\big(F_{\\text{net},z} + \\tfrac{\\tau_{\\text{net},y}}{w}\\big)\\\\
         &= \\tfrac12\\big(${num(Fn[2])} + ${par(ty)}\\big) = \\mathbf{${num(res.FJL[2])}}${N}\\\\
-        F_{JD,z} &= \\tfrac12\\big(F_{\\text{net},z} - \\tfrac{\\tau_{\\text{net},y}}{w}\\big)\\\\
+        F_{J${D},z} &= \\tfrac12\\big(F_{\\text{net},z} - \\tfrac{\\tau_{\\text{net},y}}{w}\\big)\\\\
         &= \\tfrac12\\big(${num(Fn[2])} - ${par(ty)}\\big) = \\mathbf{${num(res.FJR[2])}}${N}\\\\[4pt]
-        F_{JI,y} &= \\tfrac12\\big(F_{\\text{net},y} - \\tfrac{\\tau_{\\text{net},z}}{w}\\big)\\\\
+        F_{J${I},y} &= \\tfrac12\\big(F_{\\text{net},y} - \\tfrac{\\tau_{\\text{net},z}}{w}\\big)\\\\
         &= \\tfrac12\\big(${num(Fn[1])} - ${par(tz)}\\big) = \\mathbf{${num(res.FJL[1])}}${N}\\\\
-        F_{JD,y} &= \\tfrac12\\big(F_{\\text{net},y} + \\tfrac{\\tau_{\\text{net},z}}{w}\\big)\\\\
+        F_{J${D},y} &= \\tfrac12\\big(F_{\\text{net},y} + \\tfrac{\\tau_{\\text{net},z}}{w}\\big)\\\\
         &= \\tfrac12\\big(${num(Fn[1])} + ${par(tz)}\\big) = \\mathbf{${num(res.FJR[1])}}${N}\\\\[4pt]
-        F_{JI,x} &= F_{JD,x} = \\tfrac12 F_{\\text{net},x} = \\tfrac12\\cdot${par(Fn[0])} = \\mathbf{${num(res.FJL[0])}}${N} \\quad\\text{(supuesto)}\\\\[8pt]
-        \\vec F_{JI} &= ${row(res.FJL)}${N}, \\quad \\|\\vec F_{JI}\\| = ${num(vec.norm(res.FJL))}${N}\\\\
-        \\vec F_{JD} &= ${row(res.FJR)}${N}, \\quad \\|\\vec F_{JD}\\| = ${num(vec.norm(res.FJR))}${N}
+        F_{J${I},x} &= F_{J${D},x} = \\tfrac12 F_{\\text{net},x} = \\tfrac12\\cdot${par(Fn[0])} = \\mathbf{${num(res.FJL[0])}}${N} \\quad ${t('s.assumption')}\\\\[8pt]
+        \\vec F_{J${I}} &= ${row(res.FJL)}${N}, \\quad \\|\\vec F_{J${I}}\\| = ${num(vec.norm(res.FJL))}${N}\\\\
+        \\vec F_{J${D}} &= ${row(res.FJR)}${N}, \\quad \\|\\vec F_{J${D}}\\| = ${num(vec.norm(res.FJR))}${N}
     \\end{aligned}`);
     const verdict = (F, name) => (F[2] > 1e-6
-        ? `<li class="bad">${name}: ${im('F_z > 0')} → <b>distracción</b>. La fosa tendría que tirar del cóndilo hacia arriba, cosa que una articulación no puede hacer.</li>`
-        : `<li class="ok">${name}: ${im('F_z < 0')} → <b>compresión</b>. La fosa empuja el cóndilo hacia abajo, que es lo físicamente posible.</li>`);
-    $('s7-interp').innerHTML = `<ul class="verdicts">${verdict(res.FJL, 'ATM izquierda')}${verdict(res.FJR, 'ATM derecha')}</ul>`;
+        ? `<li class="bad">${t('s.verdictBad', { name, cond: im('F_z > 0') })}</li>`
+        : `<li class="ok">${t('s.verdictOk', { name, cond: im('F_z < 0') })}</li>`);
+    $('s7-interp').innerHTML = `<ul class="verdicts">${verdict(res.FJL, t('joint.L'))}${verdict(res.FJR, t('joint.R'))}</ul>`;
 
     // ---- Step 8: verification
     tex($('s8-math'), `\\begin{aligned}
-        \\textstyle\\sum \\vec F &= \\vec R + \\vec F_B + \\vec F_{JI} + \\vec F_{JD}\\\\
+        \\textstyle\\sum \\vec F &= \\vec R + \\vec F_B + \\vec F_{J${I}} + \\vec F_{J${D}}\\\\
         &= ${row(res.residualF, 3)}${N}\\\\[4pt]
-        \\textstyle\\sum \\vec \\tau &= \\vec T_m + \\vec\\tau_B + \\vec r_{JI}\\times\\vec F_{JI} + \\vec r_{JD}\\times\\vec F_{JD}\\\\
+        \\textstyle\\sum \\vec \\tau &= \\vec T_m + \\vec\\tau_B + \\vec r_{J${I}}\\times\\vec F_{J${I}} + \\vec r_{J${D}}\\times\\vec F_{J${D}}\\\\
         &= ${row(res.residualT, 3)}${NMM}
     \\end{aligned}`);
 
@@ -183,16 +189,16 @@ export function renderSteps(state, posed, res, selectedId) {
             M &= \\left(-\\frac{T_{m,y}}{R_z},\\ \\frac{T_{m,x}}{R_z}\\right)\\\\
             &= \\left(-\\frac{${num(res.Tm[1], 0)}}{${num(res.R[2])}},\\ \\frac{${num(res.Tm[0], 0)}}{${num(res.R[2])}}\\right)\\\\
             &= (${num(res.M[0])},\\ ${num(res.M[1])})${MM}\\\\[4pt]
-            M &= \\lambda_I\\,J_I + \\lambda_D\\,J_D + \\lambda_B\\,B\\\\
-            &\\Rightarrow\\ \\lambda_I = ${num(lL, 3)},\\ \\lambda_D = ${num(lR, 3)},\\ \\lambda_B = ${num(lB, 3)}\\\\[4pt]
+            M &= \\lambda_${I}\\,J_${I} + \\lambda_${D}\\,J_${D} + \\lambda_B\\,B\\\\
+            &\\Rightarrow\\ \\lambda_${I} = ${num(lL, 3)},\\ \\lambda_${D} = ${num(lR, 3)},\\ \\lambda_B = ${num(lB, 3)}\\\\[4pt]
             F_B &${eq} \\lambda_B R_z = ${num(lB, 3)}\\cdot${num(res.R[2])} = ${num(lB * res.R[2])}${N}\\\\
-            -F_{JI,z} &${eq} \\lambda_I R_z = ${num(lL * res.R[2])}${N}\\\\
-            -F_{JD,z} &${eq} \\lambda_D R_z = ${num(lR * res.R[2])}${N}\\\\[4pt]
-            \\text{VM} &= \\frac{F_B}{\\sum F_i} = \\frac{${num(res.FB)}}{${num(res.sumForces, 0)}} = \\boxed{${num(res.MA, 2)}}
+            -F_{J${I},z} &${eq} \\lambda_${I} R_z = ${num(lL * res.R[2])}${N}\\\\
+            -F_{J${D},z} &${eq} \\lambda_${D} R_z = ${num(lR * res.R[2])}${N}\\\\[4pt]
+            ${t('s.ma')} &= \\frac{F_B}{\\sum F_i} = \\frac{${num(res.FB)}}{${num(res.sumForces, 0)}} = \\boxed{${num(res.MA, 2)}}
         \\end{aligned}`);
         $('s9-note').hidden = vertical;
     } else {
-        tex(s9, `R_z \\le 0 \\;\\Rightarrow\\; \\text{los músculos no empujan hacia arriba: no hay triángulo de soporte que analizar}`);
+        tex(s9, `R_z \\le 0 \\;\\Rightarrow\\; ${t('s.noRz')}`);
         $('s9-note').hidden = true;
     }
 }

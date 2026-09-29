@@ -1,12 +1,13 @@
 // Application entry point: state, render loop and wiring between model, viewer and UI.
 /* global renderMathInElement */
 import { vec } from './modules/math.js';
-import { createMuscles, solveState, sweepArch, SCENARIOS, describeBite } from './modules/model.js';
+import { createMuscles, localizeMuscles, solveState, sweepArch, SCENARIOS, describeBite, toothName } from './modules/model.js';
+import { t, setLang, applyStatic } from './modules/i18n.js';
 import { JawViewer } from './modules/viewer.js';
 import { renderSteps } from './modules/steps.js';
 import { renderTriangleChart } from './modules/charts.js';
 import {
-    initUI, syncControls, renderResults, renderArchPicker, showTab, flashMuscleCard, setPlayButton, clearScenario
+    initUI, localizeUI, syncControls, renderResults, renderArchPicker, showTab, flashMuscleCard, setPlayButton, clearScenario
 } from './modules/ui.js';
 
 const defaultState = () => ({
@@ -24,8 +25,8 @@ let dirty = true;
 let lastHeavy = 0;
 
 function isDark() {
-    const t = document.documentElement.dataset.theme;
-    if (t) return t === 'dark';
+    const theme = document.documentElement.dataset.theme;
+    if (theme) return theme === 'dark';
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
@@ -46,10 +47,10 @@ const actions = {
         ui.playing = false;
         setPlayButton(false);
         dirty = true;
-        announce(sc.hint);
+        announce(t(`sc.${sc.id}.hint`));
     },
-    setBite(t) {
-        state.bite.t = t;
+    setBite(pos) {
+        state.bite.t = pos;
         state.bite.custom = false;
         clearScenario();
         dirty = true;
@@ -58,6 +59,15 @@ const actions = {
         const m = state.muscles.find((x) => x.id === id);
         if (!m) return;
         state.selectedMuscle = id;
+        dirty = true;
+    },
+    setLang(l) {
+        setLang(l);
+        applyStatic();
+        renderStaticMath();
+        localizeMuscles(state.muscles);
+        localizeUI();
+        viewer.relabel();
         dirty = true;
     },
     toggleTheme() {
@@ -125,20 +135,24 @@ function onPick(info) {
 function describe(d) {
     const { res } = solveState(state);
     const n = (x) => x.toFixed(0);
+    const hint = (key) => `<span class="muted">${t(key)}</span>`;
     if (d.kind === 'muscle') {
         const m = res.muscles.find((x) => x.id === d.id);
         const base = state.muscles.find((x) => x.id === d.id);
-        if (!m) return `<b>${base.name}</b><br><span class="muted">Inactivo</span>`;
-        return `<b>${m.name}</b><br>F = ${n(m.force)} N · brazo b = ${m.lever.toFixed(1)} mm<br>τ<sub>x</sub> = ${(m.tau[0] / 1000).toFixed(2)} N·m<br><span class="muted">Clic para seleccionar</span>`;
+        if (!m) return `<b>${base.name}</b><br>${hint('tip.inactive')}`;
+        return `<b>${m.name}</b><br>${t('tip.muscle', { F: n(m.force), b: m.lever.toFixed(1) })}<br>τ<sub>x</sub> = ${(m.tau[0] / 1000).toFixed(2)} N·m<br>${hint('tip.select')}`;
     }
-    if (d.kind === 'tooth') return `<b>${d.label}</b><br><span class="muted">Clic para morder aquí</span>`;
-    if (d.kind === 'bite') return `<b>Mordida</b> (${state.bite.custom ? 'punto personalizado' : describeBite(state.bite.t)})<br>F<sub>B</sub> = ${n(res.FB)} N`;
+    if (d.kind === 'tooth') return `<b>${toothName(d.i, d.side)}</b><br>${hint('tip.tooth')}`;
+    if (d.kind === 'bite') {
+        return `<b>${t('tip.bite')}</b> (${state.bite.custom ? t('tip.custom') : describeBite(state.bite.t)})<br>F<sub>B</sub> = ${n(res.FB)} N`;
+    }
     if (d.kind === 'joint' || d.kind === 'condyle') {
         const F = d.side === 'L' ? res.FJL : res.FJR;
-        return `<b>ATM ${d.side === 'L' ? 'izquierda' : 'derecha'}</b><br>‖F‖ = ${n(vec.norm(F))} N · [${F.map(n).join(', ')}]<br>${F[2] > 1e-6 ? '<span class="bad">distracción</span>' : 'compresión'}`;
+        const bad = F[2] > 1e-6;
+        return `<b>${t(`joint.${d.side}`)}</b><br>‖F‖ = ${n(vec.norm(F))} N · [${F.map(n).join(', ')}]<br>${bad ? `<span class="bad">${t('distraction')}</span>` : t('compression')}`;
     }
-    if (d.kind === 'triangle') return '<b>Triángulo de soporte</b><br>ATM I · ATM D · mordida';
-    return d.label || '';
+    if (d.kind === 'triangle') return `<b>${t('tip.triangle')}</b><br>${t('tip.triangleSub')}`;
+    return '';
 }
 
 function frame() {
@@ -171,6 +185,19 @@ function frame() {
     applyFocus();
 }
 
+// Renders the \( \) and $$ $$ formulas of the static (translated) text
+function renderStaticMath() {
+    if (typeof renderMathInElement === 'undefined') return;
+    renderMathInElement(document.body, {
+        delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '\\(', right: '\\)', display: false }
+        ],
+        ignoredClasses: ['math'],
+        throwOnError: false
+    });
+}
+
 let announceTimer = null;
 function announce(text) {
     let el = document.getElementById('toast');
@@ -196,17 +223,10 @@ function init() {
         if (!document.documentElement.dataset.theme) viewer.setTheme(isDark());
     });
 
+    applyStatic();
     initUI(state, actions);
-    if (typeof renderMathInElement !== 'undefined') {
-        renderMathInElement(document.body, {
-            delimiters: [
-                { left: '$$', right: '$$', display: true },
-                { left: '\\(', right: '\\)', display: false }
-            ],
-            ignoredClasses: ['math'],
-            throwOnError: false
-        });
-    }
+    viewer.relabel();
+    renderStaticMath();
     viewer.setView('iso', state.geom);
 }
 

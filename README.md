@@ -2,7 +2,7 @@
 
 Herramienta educativa e interactiva para entender la **estática de la mandíbula de un mamífero genérico**, como modelo de biomecánica animal. Calcula la fuerza de mordida y las reacciones en las dos articulaciones temporomandibulares (ATM) a partir de las fuerzas musculares, y muestra **toda la matemática paso a paso con los números actuales**.
 
-Hecha con HTML, CSS y JavaScript (ES Modules), **Three.js** (r170) y **KaTeX**, sin paso de compilación.
+Hecha con HTML, CSS y JavaScript (ES Modules), **Three.js** (r170) y **KaTeX**, sin paso de compilación. Disponible en **español e inglés** (selector ES/EN en la cabecera).
 
 ## Qué se puede hacer
 
@@ -42,7 +42,15 @@ $F_z<0$ en una ATM significa compresión (físicamente posible). $F_z>0$ signifi
 | `modules/steps.js` | Memoria de cálculo en KaTeX con valores en vivo |
 | `modules/charts.js` | Gráficas SVG (barrido por la arcada, triángulo de soporte) |
 | `modules/ui.js` | Controles y paneles de resultados |
+| `modules/i18n.js` | Traducción: `t(clave, vars)`, formato numérico y atributos `data-i18n` |
+| `modules/locales/es.js`, `en.js` | Todos los textos visibles (HTML y KaTeX), uno por idioma |
 | `tests/math.test.mjs` | Tests del solver (equilibrio, simetría, palanca, Greaves) |
+
+## Idiomas
+
+Todo el texto visible está en `modules/locales/es.js` y `modules/locales/en.js`, con las mismas claves. En el HTML, `data-i18n="clave"` rellena el contenido del elemento y `data-i18n-attr="title:clave"` rellena atributos. En JS se usa `t('clave', { var })`. Los subíndices cambian con el idioma (F<sub>JI</sub>/F<sub>JD</sub> ↔ F<sub>JL</sub>/F<sub>JR</sub>). El idioma se detecta del navegador y la elección se guarda en `localStorage`.
+
+Para añadir otro idioma basta con copiar `en.js`, traducir los valores y registrarlo en `modules/i18n.js`.
 
 ## Ejecutar
 

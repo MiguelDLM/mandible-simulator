@@ -5,6 +5,7 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { vec } from './math.js';
 import { TEETH, TOOTH_CENTERS, REF } from './model.js';
+import { t } from './i18n.js';
 
 const V3 = (a) => new THREE.Vector3(a[0], a[1], a[2]);
 const Y_UP = new THREE.Vector3(0, 1, 0);
@@ -105,15 +106,17 @@ export class JawViewer {
         // Axes (anatomical)
         this.axes = new THREE.Group();
         const axisDefs = [
-            [[1, 0, 0], '#ef4444', 'X lateral (der.)'],
-            [[0, 1, 0], '#22c55e', 'Y anterior'],
-            [[0, 0, 1], '#3b82f6', 'Z superior']
+            [[1, 0, 0], '#ef4444', 'axis.x'],
+            [[0, 1, 0], '#22c55e', 'axis.y'],
+            [[0, 0, 1], '#3b82f6', 'axis.z']
         ];
-        axisDefs.forEach(([d, color, text]) => {
+        this.axisLabels = [];
+        axisDefs.forEach(([d, color, key]) => {
             const a = new THREE.ArrowHelper(V3(d), new THREE.Vector3(), 34, color, 6, 3);
             this.axes.add(a);
             const lbl = makeLabel('lbl-axis');
-            lbl.element.textContent = text;
+            lbl.element.dataset.key = key;
+            this.axisLabels.push(lbl);
             lbl.element.style.color = color;
             lbl.position.copy(V3(d).multiplyScalar(42));
             this.axes.add(lbl);
@@ -153,7 +156,7 @@ export class JawViewer {
             new THREE.SphereGeometry(1, 20, 14),
             new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0x92400e, emissiveIntensity: 0.4, transparent: true })
         );
-        this.biteMarker.userData = { kind: 'bite', label: 'Punto de mordida' };
+        this.biteMarker.userData = { kind: 'bite' };
         scene.add(this.biteMarker);
         this.biteArrow = makeArrow(COLORS.bite);
         scene.add(this.biteArrow);
@@ -162,8 +165,8 @@ export class JawViewer {
         this._tag(this.biteMarker, ['bite']);
         this._tag(this.biteArrow, ['bite']);
         this._tagLabel(this.biteLabel, ['bite']);
-        this._pick(this.biteMarker, { kind: 'bite', label: 'Punto de mordida' });
-        this._pickArrow(this.biteArrow, { kind: 'bite', label: 'Fuerza de mordida' });
+        this._pick(this.biteMarker, { kind: 'bite' });
+        this._pickArrow(this.biteArrow, { kind: 'bite' });
 
         // Joints
         this.jointArrows = { L: makeArrow(COLORS.jointL), R: makeArrow(COLORS.jointR) };
@@ -173,7 +176,7 @@ export class JawViewer {
             scene.add(this.jointLabels[s]);
             this._tag(this.jointArrows[s], ['joints', `joint:${s}`]);
             this._tagLabel(this.jointLabels[s], ['joints', `joint:${s}`]);
-            this._pickArrow(this.jointArrows[s], { kind: 'joint', side: s, label: `Reacción ATM ${s === 'L' ? 'izquierda' : 'derecha'}` });
+            this._pickArrow(this.jointArrows[s], { kind: 'joint', side: s });
         });
 
         // Support triangle + equivalent resultant
@@ -191,7 +194,7 @@ export class JawViewer {
         scene.add(this.triangleGroup);
         [this.triangle, this.triangleEdge, this.mMarker, this.mArrow].forEach((o) => this._tag(o, ['triangle']));
         this._tagLabel(this.mLabel, ['triangle']);
-        this._pick(this.triangle, { kind: 'triangle', label: 'Triángulo de soporte' });
+        this._pick(this.triangle, { kind: 'triangle' });
 
         // Lever-arm helpers
         this.levers = new THREE.Group();
@@ -288,9 +291,9 @@ export class JawViewer {
         this.teeth = [];
         [-1, 1].forEach((sx) => {
             TEETH.forEach((tooth, i) => {
-                const t = sx * TOOTH_CENTERS[i];
-                const p = arch.point(t);
-                const tan = arch.tangent(t);
+                const pos = sx * TOOTH_CENTERS[i];
+                const p = arch.point(pos);
+                const tan = arch.tangent(pos);
                 const md = tooth.md * arch.toothScale * 0.92;
                 const h = tooth.h * s;
                 const mesh = add(new THREE.Mesh(
@@ -299,7 +302,7 @@ export class JawViewer {
                 ), ['jaw', 'teeth']);
                 mesh.position.set(p[0], p[1], p[2] - h / 2);
                 mesh.rotation.z = Math.atan2(tan[1], tan[0]);
-                mesh.userData = { kind: 'tooth', t, label: `${tooth.name} ${sx < 0 ? 'izquierdo' : 'derecho'}`, jaw: true };
+                mesh.userData = { kind: 'tooth', t: pos, i, side: sx < 0 ? 'L' : 'R', jaw: true };
                 this.pickables.push(mesh);
                 this.teeth.push(mesh);
             });
@@ -393,7 +396,7 @@ export class JawViewer {
             if (mid) {
                 lbl.position.copy(mid);
                 const bad = F[2] > 1e-6;
-                lbl.element.textContent = `F_J${side === 'L' ? 'I' : 'D'} ${vec.norm(F).toFixed(0)} N${bad ? ' ⚠' : ''}`;
+                lbl.element.textContent = `F_J${t(`sub.${side}`)} ${vec.norm(F).toFixed(0)} N${bad ? ' ⚠' : ''}`;
                 lbl.element.classList.toggle('lbl-bad', bad);
             }
         });
@@ -467,7 +470,12 @@ export class JawViewer {
         const footB = [rB[0], rB[1] + sb * u[1], rB[2] + sb * u[2]];
         this.leverBite.geometry.setFromPoints([V3([rB[0], 0, 0]), V3(footB), V3(rB)]);
         this.leverLabelB.position.copy(V3([rB[0], footB[1] / 2, footB[2] / 2]));
-        this.leverLabelB.element.textContent = `brazo mordida ${Math.hypot(footB[1], footB[2]).toFixed(1)} mm`;
+        this.leverLabelB.element.textContent = `${t('lbl.biteArm')} ${Math.hypot(footB[1], footB[2]).toFixed(1)} mm`;
+    }
+
+    /** Refreshes the texts that do not change every frame (after a language switch). */
+    relabel() {
+        this.axisLabels.forEach((l) => { l.element.textContent = t(l.element.dataset.key); });
     }
 
     showLever(muscleId) {
