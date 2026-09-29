@@ -1,59 +1,52 @@
-# 🦷 Simulador Biomecánico de la Mandíbula Humana en 3D
+# 🦴 Mandíbula 3D · Biomecánica paso a paso
 
-Este es un micrositio educativo e interactivo diseñado para simular y analizar de forma tridimensional la **biomecánica de la mandíbula humana**. La aplicación utiliza física de **equilibrio estático de cuerpo rígido** para calcular la fuerza reactiva de mordida y las fuerzas de reacción en la articulación temporomandibular (ATM) a partir de los vectores de tracción muscular.
+Herramienta educativa e interactiva para entender la **estática de la mandíbula de un mamífero genérico**, como modelo de biomecánica animal. Calcula la fuerza de mordida y las reacciones en las dos articulaciones temporomandibulares (ATM) a partir de las fuerzas musculares, y muestra **toda la matemática paso a paso con los números actuales**.
 
-Desarrollado con **HTML5, CSS3, Three.js y KaTeX** (para el renderizado dinámico de fórmulas matemáticas en tiempo real).
+Hecha con HTML, CSS y JavaScript (ES Modules), **Three.js** (r170) y **KaTeX**, sin paso de compilación.
 
----
+## Qué se puede hacer
 
+- Elegir el diente con que se muerde (clic en la arcada, en un diente del modelo 3D o en la gráfica), la dirección de la reacción y la apertura bucal θ.
+- Ajustar la fuerza, la activación y las coordenadas de 4 pares de músculos (masetero, temporal, pterigoideo medial y lateral), con simetría enlazable.
+- Cargar escenarios de ejemplo: mordida incisal, molar, lado de balance reducido, distracción articular y boca abierta.
+- Ver la **fuerza según la posición de mordida**, el **aporte de cada músculo** al momento de cierre (F·b) y el **triángulo de soporte** de Greaves.
+- Seguir la memoria de cálculo en 10 pasos. Al pasar el ratón por un paso se resaltan en 3D los elementos que intervienen, y en los pasos 3 y 4 se dibujan los brazos de momento.
 
-## 🛠️ Estructura del Código del Proyecto
+## El modelo
 
-La aplicación está diseñada de forma modular bajo la especificación de **JavaScript moderno (ES Modules)**:
+Sistema de referencia: origen en el punto medio entre cóndilos, **X** lateral (+ derecha del animal), **Y** anterior y **Z** superior. Los cóndilos están en $[\mp w, 0, 0]$, sobre el eje de bisagra X.
 
-* **`index.html`:** Contiene el diseño y la estructura del dashboard dividida en el panel de parámetros (sliders de músculos y geometría), el visor interactivo en 3D, y el panel derecho con las pestañas de **Resultados**, **Memoria de Cálculo** (KaTeX) y el **Glosario Biomecánico**.
-* **`styles.css`:** Define el diseño visual premium en modo oscuro/claro, la distribución flexible (Flexbox), las alertas físicas de advertencia y las tarjetas con sombreado de cristal del glosario.
-* **`app.js`:** Es el orquestador principal de la aplicación. Gestiona el estado de los parámetros, captura eventos del DOM y coordina las actualizaciones de los componentes de física y gráficos 3D.
-* **`modules/math.js`:** El motor matemático del simulador. Implementa el resolvedor biomecánico puro `solveBiomechanics(state)` para calcular las fuerzas de mordida y ATM utilizando sistemas lineales tridimensionales y álgebra de vectores.
-* **`modules/viewer.js`:** Controla todo el entorno gráfico de **Three.js** (luces, cámara, render de la mandíbula, visualización de vectores en flechas de colores, control de ejes y selección por Raycasting).
-* **`modules/ui.js`:** Administra la reactividad de la interfaz, el redibujado de sliders al cambiar proporciones, el formateo numérico y la inyección dinámica de ecuaciones desglosadas KaTeX.
+Incógnitas: $F_B$ (1), $\vec F_{JI}$ (3) y $\vec F_{JD}$ (3), es decir, 7. Ecuaciones: $\sum\vec F=0$ y $\sum\vec\tau=0$, es decir, 6. Se añade el supuesto $F_{JI,x}=F_{JD,x}$.
 
----
+1. Músculos: $\hat u_i = \frac{\vec o_i-\vec r_i}{\|\vec o_i-\vec r_i\|}$, $\vec F_i = F_i\hat u_i$, $\vec\tau_i=\vec r_i\times\vec F_i$.
+2. **Momento en X** (las ATM no intervienen porque están sobre el eje): $F_B = \dfrac{-T_{m,x}}{y_B u_{Bz}-z_B u_{By}}$. Con mordida vertical se reduce a $F_B = \sum F_i b_i / y_B$ (ley de la palanca).
+3. Lo que deben aportar las ATM: $\vec F_{net} = -(\vec R+\vec F_B)$ y $\vec\tau_{net} = -(\vec T_m+\vec\tau_B)$.
+4. Reacciones:
+   - $F_{JI,z} = \tfrac12(F_{net,z} + \tau_{net,y}/w)$, $F_{JD,z} = \tfrac12(F_{net,z} - \tau_{net,y}/w)$
+   - $F_{JI,y} = \tfrac12(F_{net,y} - \tau_{net,z}/w)$, $F_{JD,y} = \tfrac12(F_{net,y} + \tau_{net,z}/w)$
+   - $F_{JI,x} = F_{JD,x} = \tfrac12F_{net,x}$
+5. Verificación: los residuos de $\sum\vec F$ y $\sum\vec\tau$ se muestran en pantalla y deben ser ≈ 0.
 
-## 🧮 Ecuaciones Biomecánicas del Simulador
+$F_z<0$ en una ATM significa compresión (físicamente posible). $F_z>0$ significa distracción: la articulación tendría que tirar.
 
-El motor físico de la aplicación resuelve el sistema tridimensional de fuerzas y torques tomando el cóndilo ATM izquierdo como el origen del sistema de referencia $[0, 0, 0]$:
+## Estructura
 
-### 1. Fuerzas y Torques Musculares
-Para cada músculo activo $i$:
-* Vector de tracción unitario: $\hat{u}_i = \frac{\vec{origin}_i - \vec{r}_i}{\|\vec{origin}_i - \vec{r}_i\|}$
-* Fuerza vectorial: $\vec{F}_i = F_i \cdot \hat{u}_i$
-* Torque muscular sobre el origen: $\vec{\tau}_i = \vec{r}_i \times \vec{F}_i$
+| Archivo | Rol |
+|---|---|
+| `index.html` | Estructura, textos de los pasos y conceptos |
+| `styles.css` | Tema claro/oscuro (sigue al sistema) y diseño responsive |
+| `app.js` | Estado, bucle de render y conexión entre módulos |
+| `modules/math.js` | Vectores y `solveStatics()`: el solver puro |
+| `modules/model.js` | Anatomía de referencia, músculos, arcada dental, pose y escenarios |
+| `modules/viewer.js` | Escena Three.js (eje Z hacia arriba, objetos reutilizados sin fugas de memoria) |
+| `modules/steps.js` | Memoria de cálculo en KaTeX con valores en vivo |
+| `modules/charts.js` | Gráficas SVG (barrido por la arcada, triángulo de soporte) |
+| `modules/ui.js` | Controles y paneles de resultados |
+| `tests/math.test.mjs` | Tests del solver (equilibrio, simetría, palanca, Greaves) |
 
-### 2. Fuerza de Mordida ($\vec{F}_B$)
-Resolviendo para el torque sobre el eje principal de rotación (bisagra, Eje X):
-$$F_B = \frac{-T_x}{y_B u_{Bz} - z_B u_{By}}$$
-Donde $T_x$ es el torque neto de todos los músculos elevadores sobre el eje X.
+## Ejecutar
 
-### 3. Fuerzas de Reacción Condilares ($\vec{F}_{JL}, \vec{F}_{JR}$)
-Balanceando las fuerzas y torques residuales mediante las articulaciones izquierda ($L$) y derecha ($R$) separadas por el ancho intercondilar $2w$:
-* **Fuerza Vertical (Z):** $F_{JRz} = \frac{1}{2} \left(F_{\text{net}, z} + \frac{\tau_{\text{net}, y}}{w}\right)$, $F_{JLz} = \frac{1}{2} \left(F_{\text{net}, z} - \frac{\tau_{\text{net}, y}}{w}\right)$
-* **Fuerza Anteroposterior (Y):** $F_{JLy} = \frac{1}{2} \left(F_{\text{net}, y} + \frac{\tau_{\text{net}, z}}{w}\right)$, $F_{JRy} = \frac{1}{2} \left(F_{\text{net}, y} - \frac{\tau_{\text{net}, z}}{w}\right)$
-* **Fuerza Lateral (X):** $F_{JLx} = F_{JRx} = \frac{1}{2} F_{\text{net}, x}$
-
----
-
-## 🚀 Cómo Ejecutar el Proyecto Localmente
-
-Para visualizar el micrositio interactivo:
-
-1. Clonar el repositorio o descargar los archivos.
-2. Iniciar un servidor HTTP local en la raíz del proyecto para permitir la carga correcta de los módulos JS (`type="module"`):
-   ```bash
-   # Usando Python
-   python3 -m http.server 8080
-   
-   # O usando Node.js (npx)
-   npx serve .
-   ```
-3. Abra su navegador web favorito y acceda a: **`http://localhost:8080/index.html`**
+```bash
+python3 -m http.server 8080   # y abrir http://localhost:8080
+npm test                      # o: node --test tests/*.test.mjs  (Node ≥ 18)
+```

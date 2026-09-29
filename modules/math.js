@@ -1,147 +1,143 @@
-// Vector Math Utilities
+// Pure math: 3D vector helpers and the rigid-body statics solver of the mandible.
+// Anatomical frame (mm, N): origin at the midpoint between condyles,
+// +X = the animal's right, +Y = anterior, +Z = superior. The hinge axis is the X axis.
+
 export const vec = {
-    add: (v1, v2) => [v1[0] + v2[0], v1[1] + v2[1], v1[2] + v2[2]],
-    sub: (v1, v2) => [v1[0] - v2[0], v1[1] - v2[1], v1[2] - v2[2]],
+    add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+    sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
     scale: (v, s) => [v[0] * s, v[1] * s, v[2] * s],
-    dot: (v1, v2) => v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2],
-    cross: (v1, v2) => [
-        v1[1] * v2[2] - v1[2] * v2[1],
-        v1[2] * v2[0] - v1[0] * v2[2],
-        v1[0] * v2[1] - v1[1] * v2[0]
+    dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+    cross: (a, b) => [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0]
     ],
-    norm: (v) => Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]),
+    norm: (v) => Math.hypot(v[0], v[1], v[2]),
     normalize: (v) => {
         const n = vec.norm(v);
         return n > 0 ? vec.scale(v, 1 / n) : [0, 0, 0];
     },
-    format: (v, dec = 1) => `[${v[0].toFixed(dec)}, ${v[1].toFixed(dec)}, ${v[2].toFixed(dec)}]`,
-    rotateX: (p, theta) => {
-        const cosT = Math.cos(theta);
-        const sinT = Math.sin(theta);
-        return [
-            p[0],
-            p[1] * cosT + p[2] * sinT,
-            -p[1] * sinT + p[2] * cosT
-        ];
-    }
+    sum: (list) => list.reduce((acc, v) => vec.add(acc, v), [0, 0, 0])
 };
 
 /**
- * Solve static biomechanical equations of the jaw model.
- * 
- * @param {Object} state - The global application state containing jaw parameters.
- * @returns {Object} Calculated metrics (vectors, advantage, etc.)
+ * Rotates a point of the mandible about the hinge (X) axis.
+ * theta > 0 opens the mouth: the chin (+Y) moves down (-Z).
  */
-export function solveBiomechanics(state) {
-    const w = state.w;
-    const L = state.L;
-    const theta = state.theta || 0;
-    
-    // Rotate bite point in anatomical space
-    const rB = vec.rotateX(state.rB, theta);
-    const uB = state.uB;
-    
-    let totalMuscleTorque = [0, 0, 0];
-    let sumActiveForcesScalar = 0;
-    let sumActiveForcesVector = [0, 0, 0];
-    const musclesComputed = [];
-    
-    state.muscles.forEach((m) => {
-        if (!m.active) return;
-        
-        // Rotate muscle insertion on mandible, origin on skull is static
-        const r_rotated = vec.rotateX(m.r, theta);
-        
-        // Direction vector from insertion pointing toward skull origin
-        const dirVec = vec.sub(m.origin, r_rotated);
-        const u_i = vec.normalize(dirVec);
-        
-        // Force vector
-        const F_i = vec.scale(u_i, m.force);
-        
-        // Torque about origin (ATM midpoint)
-        const tau_i = vec.cross(r_rotated, F_i);
-        
-        // Accumulate
-        totalMuscleTorque = vec.add(totalMuscleTorque, tau_i);
-        sumActiveForcesScalar += m.force;
-        sumActiveForcesVector = vec.add(sumActiveForcesVector, F_i);
-        
-        const mCopy = { ...m, r: r_rotated };
-        musclesComputed.push({
-            m: mCopy,
-            u_i,
-            F_i,
-            tau_i
-        });
+export function rotateOpen(p, theta) {
+    const c = Math.cos(theta);
+    const s = Math.sin(theta);
+    return [p[0], p[1] * c + p[2] * s, -p[1] * s + p[2] * c];
+}
+
+/** Barycentric coordinates of 2D point P in triangle (A, B, C). */
+export function barycentric(P, A, B, C) {
+    const det = (B[1] - C[1]) * (A[0] - C[0]) + (C[0] - B[0]) * (A[1] - C[1]);
+    if (Math.abs(det) < 1e-9) return null;
+    const l1 = ((B[1] - C[1]) * (P[0] - C[0]) + (C[0] - B[0]) * (P[1] - C[1])) / det;
+    const l2 = ((C[1] - A[1]) * (P[0] - C[0]) + (A[0] - C[0]) * (P[1] - C[1])) / det;
+    return [l1, l2, 1 - l1 - l2];
+}
+
+/**
+ * Static equilibrium of the mandible.
+ *
+ * Unknowns: bite force magnitude F_B (direction uB is given) and the two
+ * condylar reactions F_JL, F_JR (3 components each) -> 7 unknowns.
+ * Equations: sum F = 0 and sum tau = 0 about the origin -> 6 equations.
+ * The missing equation is supplied by the assumption F_JLx = F_JRx.
+ *
+ * @param {{w:number, rB:number[], uB:number[], muscles:{id:string, r:number[], o:number[], force:number}[]}} input
+ *   w: half intercondylar width; rB: bite point; uB: unit direction of the food reaction on the mandible;
+ *   muscles: active muscles with insertion r (on the mandible) and origin o (on the skull).
+ */
+export function solveStatics({ w, rB, uB, muscles }) {
+    const computed = muscles.map((m) => {
+        const d = vec.sub(m.o, m.r);
+        const len = vec.norm(d);
+        const u = vec.normalize(d);
+        const F = vec.scale(u, m.force);
+        const tau = vec.cross(m.r, F);
+        // Effective lever arm about the hinge axis: tau_x = F * b
+        const lever = m.force > 0 ? tau[0] / m.force : 0;
+        return { ...m, d, len, u, F, tau, lever };
     });
-    
-    const T_x = totalMuscleTorque[0];
-    
-    // Solve Bite Force (F_B)
-    const yB = rB[1];
-    const zB = rB[2];
-    const uBx = uB[0];
-    const uBy = uB[1];
-    const uBz = uB[2];
-    
-    const denominator = yB * uBz - zB * uBy;
-    
-    let FB = 0;
-    let FB_vector = [0, 0, 0];
-    let biteTorque = [0, 0, 0];
-    let divideByZero = false;
-    
-    if (theta <= 0.005) {
-        if (Math.abs(denominator) > 1e-5) {
-            FB = -T_x / denominator;
-            FB_vector = vec.scale(uB, FB);
-            biteTorque = vec.cross(rB, FB_vector);
-        } else {
-            divideByZero = true;
-        }
-    } else {
-        FB = 0;
-        FB_vector = [0, 0, 0];
-        biteTorque = [0, 0, 0];
+
+    const R = vec.sum(computed.map((c) => c.F));
+    const Tm = vec.sum(computed.map((c) => c.tau));
+    const sumForces = computed.reduce((acc, c) => acc + c.force, 0);
+
+    // 1) Moment balance about the hinge axis (X): condyles lie on X, so they drop out.
+    //    Tm_x + F_B (rB x uB)_x = 0
+    const rBxuB = vec.cross(rB, uB);
+    const denom = rBxuB[0]; // = yB*uBz - zB*uBy
+    const singular = Math.abs(denom) < 1e-6;
+    const FB = singular ? 0 : -Tm[0] / denom;
+    const FBvec = vec.scale(uB, FB);
+    const tauB = vec.cross(rB, FBvec);
+    const biteLever = -denom; // tau_Bx = -F_B * biteLever
+
+    // 2) What the joints must supply
+    const Fnet = vec.scale(vec.add(R, FBvec), -1);
+    const tauNet = vec.scale(vec.add(Tm, tauB), -1);
+
+    // 3) Joint reactions. Joint moments: rJL x FJL + rJR x FJR = [0, w(FJLz - FJRz), w(FJRy - FJLy)]
+    const FJL = [
+        Fnet[0] / 2,
+        (Fnet[1] - tauNet[2] / w) / 2,
+        (Fnet[2] + tauNet[1] / w) / 2
+    ];
+    const FJR = [
+        Fnet[0] / 2,
+        (Fnet[1] + tauNet[2] / w) / 2,
+        (Fnet[2] - tauNet[1] / w) / 2
+    ];
+
+    // 4) Verification: residuals must vanish
+    const rJL = [-w, 0, 0];
+    const rJR = [w, 0, 0];
+    const residualF = vec.sum([R, FBvec, FJL, FJR]);
+    const residualT = vec.sum([Tm, tauB, vec.cross(rJL, FJL), vec.cross(rJR, FJR)]);
+
+    // 5) Geometric reading (Greaves' support triangle): the point M of the
+    //    occlusal (XY) projection where a single vertical force R_z produces the
+    //    same tau_x and tau_y as all the muscles. Exact for a vertical bite force.
+    let M = null;
+    let bary = null;
+    if (R[2] > 1e-6) {
+        M = [-Tm[1] / R[2], Tm[0] / R[2]];
+        bary = barycentric(M, [-w, 0], [w, 0], [rB[0], rB[1]]); // [lambda_L, lambda_R, lambda_B]
     }
-    
-    // Solve Joint Reaction Forces (F_JL, F_JR)
-    const F_input_total_vec = sumActiveForcesVector;
-    const F_net = vec.scale(vec.add(FB_vector, F_input_total_vec), -1);
-    const tau_net = vec.scale(vec.add(biteTorque, totalMuscleTorque), -1);
-    
-    let F_JL = [0, 0, 0];
-    let F_JR = [0, 0, 0];
-    
-    if (w > 0) {
-        F_JR[2] = 0.5 * (F_net[2] + tau_net[1] / w);
-        F_JL[2] = 0.5 * (F_net[2] - tau_net[1] / w);
-        
-        F_JL[1] = 0.5 * (F_net[1] + tau_net[2] / w);
-        F_JR[1] = 0.5 * (F_net[1] - tau_net[2] / w);
-        
-        F_JL[0] = 0.5 * F_net[0];
-        F_JR[0] = 0.5 * F_net[0];
-    }
-    
-    const MA = sumActiveForcesScalar > 0 ? Math.abs(FB) / sumActiveForcesScalar : 0;
-    
+
     return {
+        muscles: computed,
+        R,
+        Tm,
+        sumForces,
         rB,
-        musclesComputed,
-        totalMuscleTorque,
-        sumActiveForcesScalar,
-        sumActiveForcesVector,
+        uB,
+        w,
+        rBxuB,
+        denom,
+        singular,
+        biteLever,
         FB,
-        FB_vector,
-        biteTorque,
-        denominator,
-        divideByZero,
-        F_net,
-        tau_net,
-        F_JL,
-        F_JR,
-        MA
+        FBvec,
+        tauB,
+        Fnet,
+        tauNet,
+        FJL,
+        FJR,
+        rJL,
+        rJR,
+        residualF,
+        residualT,
+        M,
+        bary,
+        MA: sumForces > 0 ? FB / sumForces : 0,
+        noBite: !singular && FB < 0,
+        // The fossa can only push the condyle down (F_z < 0 = compression).
+        distractionL: FJL[2] > 1e-6,
+        distractionR: FJR[2] > 1e-6
     };
 }

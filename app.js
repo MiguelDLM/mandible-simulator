@@ -1,404 +1,213 @@
-// Main Application Entry Point & Orchestrator
-import { solveBiomechanics, vec } from './modules/math.js';
-import { 
-    initThreeJS, 
-    update3DScene, 
-    setCameraPreset, 
-    toggleAxes, 
-    updateClearColor, 
-    onWindowResize 
-} from './modules/viewer.js';
-import { 
-    initUI, 
-    updateSlidersFromState, 
-    renderMuscleContributionChart, 
-    renderPhysicalWarnings, 
-    renderLaTeXSteps, 
-    renderStaticMath, 
-    initTooltips, 
-    initResizer, 
-    toggleTheoryModal, 
-    switchTab 
+// Application entry point: state, render loop and wiring between model, viewer and UI.
+/* global renderMathInElement */
+import { vec } from './modules/math.js';
+import { createMuscles, solveState, sweepArch, SCENARIOS, describeBite } from './modules/model.js';
+import { JawViewer } from './modules/viewer.js';
+import { renderSteps } from './modules/steps.js';
+import { renderTriangleChart } from './modules/charts.js';
+import {
+    initUI, syncControls, renderResults, renderArchPicker, showTab, flashMuscleCard, setPlayButton, clearScenario
 } from './modules/ui.js';
 
-// Global state variables
-const state = {
-    // Mandible geometry
-    w: 60, // Half intercondylar width (so 2w = 120)
-    L: 100, // Mandible length from hinge axis to symphysis (chin)
-    
-    // Bite point position
-    rB: [0, 100, -10], // Default is incisors
-    bitePreset: 'incisors',
-    
-    // Bite reaction force direction type
-    biteDirectionType: 'vertical-down',
-    uB: [0, 0, -1], // unit direction of food reaction force on mandible
-    
-    // Theme
-    theme: 'dark',
-    
-    // Active tab
-    activeTab: 'tab-results',
-    
-    // Animation properties
-    isAnimating: false,
-    animationTime: 0,
-    theta: 0,
-    
-    // Muscles configuration list
-    muscles: [
-        {
-            id: 'masseter-l',
-            name: 'Masetero Izquierdo',
-            shortName: 'M. Izq',
-            description: 'Músculo elevador principal en el lado izquierdo. Gran ventaja mecánica.',
-            active: true,
-            force: 150, // Newtons
-            r: [-50, 30, -35], // Insertion on jaw (x, y, z)
-            origin: [-60, 50, 15], // Origin on skull (x, y, z)
-            default_r: [-50, 30, -35],
-            default_origin: [-60, 50, 15],
-            color: 0x00e676
-        },
-        {
-            id: 'masseter-r',
-            name: 'Masetero Derecho',
-            shortName: 'M. Der',
-            description: 'Músculo elevador principal en el lado derecho. Gran ventaja mecánica.',
-            active: true,
-            force: 150, // Newtons
-            r: [50, 30, -35],
-            origin: [60, 50, 15],
-            default_r: [50, 30, -35],
-            default_origin: [60, 50, 15],
-            color: 0x00e676
-        },
-        {
-            id: 'temporalis-l',
-            name: 'Temporal Izquierdo',
-            shortName: 'T. Izq',
-            description: 'Se inserta en la apófisis coronoides. Fibras anteriores elevan, posteriores retruyen.',
-            active: true,
-            force: 120, // Newtons
-            r: [-45, 40, 10],
-            origin: [-55, 20, 70],
-            default_r: [-45, 40, 10],
-            default_origin: [-55, 20, 70],
-            color: 0x2979ff
-        },
-        {
-            id: 'temporalis-r',
-            name: 'Temporal Derecho',
-            shortName: 'T. Der',
-            description: 'Se inserta en la apófisis coronoides. Fibras anteriores elevan, posteriores retruyen.',
-            active: true,
-            force: 120, // Newtons
-            r: [45, 40, 10],
-            origin: [55, 20, 70],
-            default_r: [45, 40, 10],
-            default_origin: [55, 20, 70],
-            color: 0x2979ff
-        },
-        {
-            id: 'pterygoid-med-l',
-            name: 'Pterigoideo Medial Izq.',
-            shortName: 'PM. Izq',
-            description: 'Se inserta en la cara medial del ángulo mandibular. Eleva y ayuda a la lateralidad.',
-            active: true,
-            force: 80, // Newtons
-            r: [-45, 25, -35],
-            origin: [-15, 35, 0],
-            default_r: [-45, 25, -35],
-            default_origin: [-15, 35, 0],
-            color: 0xff9100
-        },
-        {
-            id: 'pterygoid-med-r',
-            name: 'Pterigoideo Medial Der.',
-            shortName: 'PM. Der',
-            description: 'Se inserta en la cara medial del ángulo mandibular. Eleva y ayuda a la lateralidad.',
-            active: true,
-            force: 80, // Newtons
-            r: [45, 25, -35],
-            origin: [15, 35, 0],
-            default_r: [45, 25, -35],
-            default_origin: [15, 35, 0],
-            color: 0xff9100
-        }
-    ]
-};
-
-// Initialize Web App
-window.addEventListener('DOMContentLoaded', () => {
-    // 1. Initialize UI Controls
-    initUI(state, {
-        onMuscleStateChange: (id, prop, val) => {
-            const m = state.muscles.find(x => x.id === id);
-            if (m) m[prop] = val;
-            if (prop === 'force') {
-                const fValHdr = document.getElementById(`val-${id}-force-hdr`);
-                if (fValHdr) fValHdr.innerText = `${val} N`;
-                const fVal = document.getElementById(`val-${id}-force`);
-                if (fVal) fVal.innerText = val;
-            }
-            calculateAndRender();
-        },
-        onMuscleVectorChange: (id, prop, index, val) => {
-            const m = state.muscles.find(x => x.id === id);
-            if (m) m[prop][index] = val;
-            const axisName = index === 0 ? 'x' : index === 1 ? 'y' : 'z';
-            const displayEl = document.getElementById(`val-${id}-${prop}${axisName}`);
-            if (displayEl) displayEl.innerText = val;
-            calculateAndRender();
-        },
-        onJawWidthChange: (val) => {
-            state.w = val / 2;
-            adjustMuscleDimensions(state.w, state.L);
-            updateBitePreset(state.bitePreset);
-            calculateAndRender();
-        },
-        onJawLengthChange: (val) => {
-            state.L = val;
-            adjustMuscleDimensions(state.w, state.L);
-            updateBitePreset(state.bitePreset);
-            calculateAndRender();
-        },
-        onBitePresetChange: (val) => {
-            updateBitePreset(val);
-            calculateAndRender();
-        },
-        onBiteCoordChange: (axis, index, val) => {
-            state.rB[index] = val;
-            const selectEl = document.getElementById('bite-preset');
-            if (selectEl) selectEl.value = 'custom';
-            state.bitePreset = 'custom';
-            calculateAndRender();
-        },
-        onBiteDirTypeChange: (val) => {
-            state.biteDirectionType = val;
-            const dirContainer = document.getElementById('bite-dir-container');
-            if (val === 'free') {
-                if (dirContainer) dirContainer.classList.remove('hidden');
-                const ux = parseFloat(document.getElementById('input-ubx').value);
-                const uy = parseFloat(document.getElementById('input-uby').value);
-                const uz = parseFloat(document.getElementById('input-ubz').value);
-                state.uB = vec.normalize([ux, uy, uz]);
-            } else {
-                if (dirContainer) dirContainer.classList.add('hidden');
-                state.uB = [0, 0, -1];
-            }
-            calculateAndRender();
-        },
-        onBiteDirCompChange: (comp, index, val) => {
-            state.uB[index] = val;
-            state.uB = vec.normalize(state.uB);
-            calculateAndRender();
-        },
-        onThemeToggle: (newTheme) => {
-            state.theme = newTheme;
-            updateClearColor(newTheme);
-        }
-    });
-
-    // 2. Initialize ThreeJS Graphics Viewer
-    initThreeJS('threejs-container', state, tick, (selectionData) => {
-        handle3DSelection(selectionData);
-    });
-
-    // 3. Setup other general UI utilities
-    initTooltips();
-    initResizer(() => onWindowResize('threejs-container'));
-
-    // 4. Initial calculations & KaTeX compiling
-    calculateAndRender();
-    if (typeof renderMathInElement !== 'undefined') {
-        renderStaticMath();
-    }
+const defaultState = () => ({
+    geom: { w: 50, L: 95 },          // w = half intercondylar width, L = hinge-to-incisor distance (mm)
+    theta: 0,                         // mouth opening (degrees)
+    bite: { t: 0, custom: false, point: [0, 95, -30], dirMode: 'vertical', alpha: 0, beta: 0 },
+    muscles: createMuscles(),
+    selectedMuscle: 'masseter-L'
 });
 
-// Primary calculation and scene redraw loop
-function calculateAndRender() {
-    // 1. Solve the biomechanics
-    const calcs = solveBiomechanics(state);
+const state = defaultState();
+const ui = { tab: 'results', focus: null, playing: false, animT: 0 };
+let viewer = null;
+let dirty = true;
+let lastHeavy = 0;
 
-    // 2. Update KPI results displays in DOM
-    const resFbMag = document.getElementById('res-fb-mag');
-    if (resFbMag) resFbMag.innerHTML = `${Math.abs(calcs.FB).toFixed(1)} <span class="kpi-unit">N</span>`;
-    
-    const resFbVec = document.getElementById('res-fb-vector');
-    if (resFbVec) resFbVec.innerText = `Vector: ${vec.format(calcs.FB_vector)} N`;
-    
-    const resFjlMag = document.getElementById('res-fjl-mag');
-    if (resFjlMag) resFjlMag.innerHTML = `${vec.norm(calcs.F_JL).toFixed(1)} <span class="kpi-unit">N</span>`;
-    
-    const resFjlVec = document.getElementById('res-fjl-vector');
-    if (resFjlVec) resFjlVec.innerText = `Vector: ${vec.format(calcs.F_JL)} N`;
-    
-    const resFjrMag = document.getElementById('res-fjr-mag');
-    if (resFjrMag) resFjrMag.innerHTML = `${vec.norm(calcs.F_JR).toFixed(1)} <span class="kpi-unit">N</span>`;
-    
-    const resFjrVec = document.getElementById('res-fjr-vector');
-    if (resFjrVec) resFjrVec.innerText = `Vector: ${vec.format(calcs.F_JR)} N`;
-    
-    const resMa = document.getElementById('res-ma');
-    if (resMa) resMa.innerText = calcs.MA.toFixed(2);
-    
-    const resSumF = document.getElementById('res-total-input-force');
-    if (resSumF) resSumF.innerText = `${calcs.sumActiveForcesScalar.toFixed(1)} N`;
-
-    // 3. Render charts & mathematical outputs
-    renderMuscleContributionChart(calcs.musclesComputed, calcs.sumActiveForcesScalar);
-    renderPhysicalWarnings(calcs.FB, calcs.F_JL, calcs.F_JR, calcs.divideByZero, state.muscles);
-    
-    renderLaTeXSteps(
-        calcs.musclesComputed,
-        calcs.totalMuscleTorque,
-        calcs.rB,
-        state.uB,
-        calcs.FB,
-        calcs.FB_vector,
-        calcs.denominator,
-        calcs.F_net,
-        calcs.tau_net,
-        state.w,
-        calcs.F_JL,
-        calcs.F_JR,
-        calcs.MA,
-        calcs.sumActiveForcesScalar,
-        state.biteDirectionType
-    );
-
-    // 4. Update the Three.js 3D viewer
-    update3DScene(
-        state.w,
-        state.L,
-        calcs.rB,
-        calcs.musclesComputed,
-        calcs.FB_vector,
-        calcs.F_JL,
-        calcs.F_JR,
-        state.theta,
-        state.theme
-    );
+function isDark() {
+    const t = document.documentElement.dataset.theme;
+    if (t) return t === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
-// Tick updater run in the ThreeJS render frame
-function tick() {
-    if (state.isAnimating) {
-        state.animationTime += 0.04;
-        state.theta = 0.15 * (0.5 - 0.5 * Math.cos(state.animationTime));
-        calculateAndRender();
+const actions = {
+    changed() { dirty = true; },
+    reset() {
+        Object.assign(state, defaultState());
+        ui.playing = false;
+        setPlayButton(false);
+        clearScenario();
+        dirty = true;
+    },
+    applyScenario(id) {
+        const sc = SCENARIOS.find((s) => s.id === id);
+        const keepGeom = { ...state.geom };
+        Object.assign(state, defaultState(), { geom: keepGeom });
+        sc.apply(state);
+        ui.playing = false;
+        setPlayButton(false);
+        dirty = true;
+        announce(sc.hint);
+    },
+    setBite(t) {
+        state.bite.t = t;
+        state.bite.custom = false;
+        clearScenario();
+        dirty = true;
+    },
+    selectMuscle(id) {
+        const m = state.muscles.find((x) => x.id === id);
+        if (!m) return;
+        state.selectedMuscle = id;
+        dirty = true;
+    },
+    toggleTheme() {
+        const next = isDark() ? 'light' : 'dark';
+        document.documentElement.dataset.theme = next;
+        try { localStorage.setItem('jaw-theme', next); } catch (e) { /* ignore */ }
+        viewer.setTheme(next === 'dark');
+    },
+    togglePlay() {
+        ui.playing = !ui.playing;
+        if (ui.playing) ui.animT = Math.acos(Math.max(-1, Math.min(1, 1 - state.theta / 12.5)));
+        setPlayButton(ui.playing);
+    },
+    setView(v) { viewer.setView(v, state.geom); },
+    setViewOption(k, v) {
+        viewer.opts[k] = v;
+        dirty = true;
+    },
+    tabChanged(name) {
+        ui.tab = name;
+        dirty = true;
+    },
+    focusStep(spec) {
+        ui.focus = spec;
+        applyFocus();
     }
-}
+};
 
-// Toggle play state of chewing animation
-function togglePlayAnimation() {
-    state.isAnimating = !state.isAnimating;
-    const btn = document.getElementById('btn-play-sim');
-    if (!btn) return;
-    
-    if (state.isAnimating) {
-        btn.innerHTML = '<i class="fa-solid fa-pause"></i> Pausa';
-        btn.style.background = '#eab308';
-        btn.style.borderColor = '#ca8a04';
-    } else {
-        btn.innerHTML = '<i class="fa-solid fa-play"></i> Simulación';
-        btn.style.background = '';
-        btn.style.borderColor = '';
-        
-        state.theta = 0;
-        calculateAndRender();
+function applyFocus() {
+    if (!viewer) return;
+    const spec = ui.focus;
+    if (!spec) {
+        viewer.setFocus(null);
+        viewer.showLever(null);
+        return;
     }
-}
-
-// Draggable Resizing proportionality calculators
-function adjustMuscleDimensions(w, L) {
-    const scaleX = w / 60;
-    const scaleY = L / 100;
-    const scaleZ = L / 100;
-    
-    state.muscles.forEach((m) => {
-        m.r[0] = Math.round(m.default_r[0] * scaleX);
-        m.r[1] = Math.round(m.default_r[1] * scaleY);
-        m.r[2] = Math.round(m.default_r[2] * scaleZ);
-        
-        m.origin[0] = Math.round(m.default_origin[0] * scaleX);
-        m.origin[1] = Math.round(m.default_origin[1] * scaleY);
-        m.origin[2] = Math.round(m.default_origin[2] * scaleZ);
+    const tags = spec.split(',').flatMap((t) => {
+        if (t === 'muscle') return [`muscle:${state.selectedMuscle}`];
+        if (t === 'lever') return [`muscle:${state.selectedMuscle}`, 'hinge'];
+        return [t];
     });
-    
-    updateSlidersFromState(state.muscles);
+    viewer.setFocus(tags);
+    viewer.showLever(spec.includes('lever') ? state.selectedMuscle : null);
 }
 
-function updateBitePreset(preset) {
-    state.bitePreset = preset;
-    const w = state.w;
-    const L = state.L;
-    
-    switch (preset) {
-        case 'incisors':
-            state.rB = [0, L, -22];
-            break;
-        case 'premolar-left':
-            state.rB = [Math.round(-0.25 * (w - 10)), Math.round(5 + 0.75 * L), -23];
-            break;
-        case 'premolar-right':
-            state.rB = [Math.round(0.25 * (w - 10)), Math.round(5 + 0.75 * L), -23];
-            break;
-        case 'molar-left':
-            state.rB = [Math.round(-0.5 * (w - 10)), Math.round(10 + 0.5 * L), -24];
-            break;
-        case 'molar-right':
-            state.rB = [Math.round(0.5 * (w - 10)), Math.round(10 + 0.5 * L), -24];
-            break;
-        case 'custom':
-            return;
-    }
-    
-    const inputX = document.getElementById('input-xb');
-    if (inputX) inputX.value = Math.round(state.rB[0]);
-    const inputY = document.getElementById('input-yb');
-    if (inputY) inputY.value = Math.round(state.rB[1]);
-    const inputZ = document.getElementById('input-zb');
-    if (inputZ) inputZ.value = Math.round(state.rB[2]);
-}
-
-// Coordinate 3D raycaster selection handling
-function handle3DSelection(data) {
-    if (data.type === 'muscle-origin' || data.type === 'muscle-line' || data.type === 'muscle-force') {
-        const mId = data.id;
-        window.toggleMuscleAccordion(mId);
-        
-        const el = document.getElementById(`muscle-config-${mId}`);
-        if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            el.style.borderColor = 'var(--color-muscle)';
-            setTimeout(() => { el.style.borderColor = ''; }, 1200);
-        }
-    } else if (data.type === 'bite-point' || data.type === 'bite-force') {
-        const detailsEl = document.getElementById('details-bite');
-        if (detailsEl) {
-            detailsEl.open = true;
-            detailsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            detailsEl.style.borderColor = 'var(--color-bite)';
-            setTimeout(() => { detailsEl.style.borderColor = ''; }, 1200);
-        }
-    } else if (data.type === 'joint' || data.type === 'joint-reaction') {
-        window.switchTab('tab-results');
-        const kpi = document.querySelector('.joint-forces-grid');
-        if (kpi) {
-            kpi.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            kpi.style.outline = '2px solid var(--color-joint-left)';
-            kpi.style.borderRadius = 'var(--border-radius-md)';
-            setTimeout(() => { kpi.style.outline = ''; }, 1200);
-        }
+function onPick(info) {
+    if (info.kind === 'tooth') {
+        actions.setBite(info.t);
+    } else if (info.kind === 'muscle') {
+        actions.selectMuscle(info.id);
+        flashMuscleCard(info.id);
+    } else if (info.kind === 'joint' || info.kind === 'condyle') {
+        showTab('steps');
+        document.getElementById('step-7').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else if (info.kind === 'bite') {
+        showTab('steps');
+        document.getElementById('step-4').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else if (info.kind === 'triangle') {
+        showTab('steps');
+        document.getElementById('step-9').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 }
 
-// Attach callbacks to global window scope so standard HTML elements can call them
-window.switchTab = switchTab;
-window.toggleTheoryModal = toggleTheoryModal;
-window.setCameraPreset = (view) => setCameraPreset(view, state.L, state.w);
-window.toggleAxes = toggleAxes;
-window.togglePlayAnimation = togglePlayAnimation;
+// Tooltip content for 3D hover
+function describe(d) {
+    const { res } = solveState(state);
+    const n = (x) => x.toFixed(0);
+    if (d.kind === 'muscle') {
+        const m = res.muscles.find((x) => x.id === d.id);
+        const base = state.muscles.find((x) => x.id === d.id);
+        if (!m) return `<b>${base.name}</b><br><span class="muted">Inactivo</span>`;
+        return `<b>${m.name}</b><br>F = ${n(m.force)} N · brazo b = ${m.lever.toFixed(1)} mm<br>τ<sub>x</sub> = ${(m.tau[0] / 1000).toFixed(2)} N·m<br><span class="muted">Clic para seleccionar</span>`;
+    }
+    if (d.kind === 'tooth') return `<b>${d.label}</b><br><span class="muted">Clic para morder aquí</span>`;
+    if (d.kind === 'bite') return `<b>Mordida</b> (${state.bite.custom ? 'punto personalizado' : describeBite(state.bite.t)})<br>F<sub>B</sub> = ${n(res.FB)} N`;
+    if (d.kind === 'joint' || d.kind === 'condyle') {
+        const F = d.side === 'L' ? res.FJL : res.FJR;
+        return `<b>ATM ${d.side === 'L' ? 'izquierda' : 'derecha'}</b><br>‖F‖ = ${n(vec.norm(F))} N · [${F.map(n).join(', ')}]<br>${F[2] > 1e-6 ? '<span class="bad">distracción</span>' : 'compresión'}`;
+    }
+    if (d.kind === 'triangle') return '<b>Triángulo de soporte</b><br>ATM I · ATM D · mordida';
+    return d.label || '';
+}
+
+function frame() {
+    if (ui.playing) {
+        ui.animT += 0.018;
+        state.theta = Math.round(12.5 * (1 - Math.cos(ui.animT)) * 10) / 10;
+        dirty = true;
+    }
+    if (!dirty) return;
+    dirty = false;
+
+    const { posed, res } = solveState(state);
+    if (res.muscles.length && !res.muscles.some((m) => m.id === state.selectedMuscle)) {
+        state.selectedMuscle = res.muscles[0].id;
+    }
+    const now = performance.now();
+    // Charts and KaTeX are the expensive part: throttle them while animating
+    const heavy = !ui.playing || now - lastHeavy > 250;
+    if (heavy) lastHeavy = now;
+
+    syncControls();
+    renderArchPicker(posed);
+    const sweep = heavy && ui.tab === 'results' ? sweepArch(state) : null;
+    renderResults(posed, res, sweep, heavy && ui.tab === 'results');
+    if (heavy && ui.tab === 'steps') {
+        renderSteps(state, posed, res, state.selectedMuscle);
+        renderTriangleChart(document.getElementById('tri-chart-steps'), res, posed);
+    }
+    viewer.update(state, posed, res);
+    applyFocus();
+}
+
+let announceTimer = null;
+function announce(text) {
+    let el = document.getElementById('toast');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'toast';
+        el.className = 'toast';
+        el.setAttribute('role', 'status');
+        document.body.appendChild(el);
+    }
+    el.textContent = text;
+    el.classList.add('show');
+    clearTimeout(announceTimer);
+    announceTimer = setTimeout(() => el.classList.remove('show'), 4200);
+}
+
+function init() {
+    viewer = new JawViewer(document.getElementById('viewer'), { onPick });
+    viewer.describe = describe;
+    viewer.setTheme(isDark());
+    viewer.onFrame = frame;
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (!document.documentElement.dataset.theme) viewer.setTheme(isDark());
+    });
+
+    initUI(state, actions);
+    if (typeof renderMathInElement !== 'undefined') {
+        renderMathInElement(document.body, {
+            delimiters: [
+                { left: '$$', right: '$$', display: true },
+                { left: '\\(', right: '\\)', display: false }
+            ],
+            ignoredClasses: ['math'],
+            throwOnError: false
+        });
+    }
+    viewer.setView('iso', state.geom);
+}
+
+init();
